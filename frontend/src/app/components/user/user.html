@@ -1,0 +1,47 @@
+<div class="container mt-5">
+  <div class="row justify-content-center">
+    <div class="col-md-8">
+      <div class="card shadow">
+        <div class="card-body">
+          <h3 class="card-title text-center mb-4">Perfil de Usuario</h3>
+          <div *ngIf="user">
+            <div *ngIf="!editMode; else editForm">
+              <p><strong>Nombre:</strong> {{user.nombre}}</p>
+              <p><strong>Apellido:</strong> {{user.apellido}}</p>
+              <p><strong>Apodo:</strong> {{user.apodo}}</p>
+              <button class="btn btn-outline-primary mb-3" (click)="enableEdit()">Editar datos</button>
+            </div>
+            <ng-template #editForm>
+              <form (ngSubmit)="saveEdit()" #editForm="ngForm">
+                <div class="mb-2">
+                  <label class="form-label">Nombre</label>
+                  <input type="text" class="form-control" [(ngModel)]="editUser.nombre" name="nombre" required>
+                </div>
+                <div class="mb-2">
+                  <label class="form-label">Apellido</label>
+                  <input type="text" class="form-control" [(ngModel)]="editUser.apellido" name="apellido" required>
+                </div>
+                <div class="mb-2">
+                  <label class="form-label">Apodo</label>
+                  <input type="text" class="form-control" [(ngModel)]="editUser.apodo" name="apodo" required>
+                </div>
+                <button type="submit" class="btn btn-success me-2">Guardar</button>
+                <button type="button" class="btn btn-secondary" (click)="cancelEdit()">Cancelar</button>
+              </form>
+            </ng-template>
+            <hr>
+            <h5>Dispositivos asociados</h5>
+            <div *ngIf="user.devices?.length; else noDevices">
+              <ul>
+                <li *ngFor="let d of user.devices">ID: {{d.deviceId}} <span *ngIf="d.nickname">- Apodo: {{d.nickname}}</span></li>
+              </ul>
+            </div>
+            <ng-template #noDevices>
+              <p class="text-muted">No tienes dispositivos asociados.</p>
+            </ng-template>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,51 @@
+<div class="container mt-5">
+  <div class="row justify-content-center">
+    <div class="col-md-8">
+      <div class="card shadow">
+        <div class="card-body">
+          <h3 class="card-title text-center mb-4">Dashboard de Dispositivos</h3>
+          <div *ngIf="devices && devices.length; else addDeviceSection">
+            <div class="mb-3">
+              <label for="selectedDevice" class="form-label">Selecciona un dispositivo</label>
+              <select id="selectedDevice" class="form-select" [(ngModel)]="selectedDeviceId" (change)="onSelectDevice()">
+                <option *ngFor="let d of devices" [value]="d.deviceId">{{d.deviceId}} <span *ngIf="d.nickname">- {{d.nickname}}</span></option>
+              </select>
+            </div>
+            <div *ngIf="selectedDevice">
+              <h5 class="mt-4">Datos del dispositivo</h5>
+              <div *ngIf="selectedDevice.sensores">
+                <div *ngFor="let sensor of selectedDevice.sensores">
+                  <div *ngIf="sensor.tipo === 'gps'">
+                    <strong>GPS:</strong> Lat: {{sensor.valores[0]}}, Lng: {{sensor.valores[1]}}, Alt: {{sensor.valores[2]}}
+                  </div>
+                  <div *ngIf="sensor.tipo === 'vitales'">
+                    <strong>Signos vitales:</strong> {{sensor.valores[0]}}
+                  </div>
+                </div>
+              </div>
+              <div *ngIf="!selectedDevice.sensores">
+                <p class="text-muted">No hay datos de sensores disponibles.</p>
+              </div>
+            </div>
+          </div>
+          <ng-template #addDeviceSection>
+            <h5 class="mb-3">No tienes dispositivos asociados</h5>
+            <form (ngSubmit)="addDevice()" #addDeviceForm="ngForm">
+              <div class="mb-3">
+                <label for="deviceId" class="form-label">Device ID</label>
+                <input type="text" id="deviceId" name="deviceId" class="form-control" [(ngModel)]="deviceId" required>
+              </div>
+              <div class="mb-3">
+                <label for="nickname" class="form-label">Apodo para el dispositivo</label>
+                <input type="text" id="nickname" name="nickname" class="form-control" [(ngModel)]="nickname">
+              </div>
+              <button type="submit" class="btn btn-primary">Agregar dispositivo</button>
+              <div *ngIf="error" class="alert alert-danger mt-3">{{error}}</div>
+              <div *ngIf="success" class="alert alert-success mt-3">{{success}}</div>
+            </form>
+          </ng-template>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
