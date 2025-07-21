@@ -8,7 +8,7 @@
   },
   "scripts": {
     "start": "node servidor.js",
-    "dev": "nodemon servidor.js",
+    "dev": "npx nodemon servidor.js",
     "test": "echo \"No tests specified\" && exit 0"
   }
 }
