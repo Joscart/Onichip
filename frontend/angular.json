@@ -5,17 +5,7 @@
   "projects": {
     "frontend": {
       "projectType": "application",
-      "schematics": {
-        "@schematics/angular:component": {
-          "standalone": false
-        },
-        "@schematics/angular:directive": {
-          "standalone": false
-        },
-        "@schematics/angular:pipe": {
-          "standalone": false
-        }
-      },
+      "schematics": {},
       "root": "",
       "sourceRoot": "src",
       "prefix": "app",
@@ -29,7 +19,8 @@
               {
                 "glob": "**/*",
                 "input": "public"
-              }
+              },
+              "src/assets"
             ],
             "styles": [
               "src/styles.css"
@@ -93,6 +84,6 @@
     }
   },
   "cli": {
-    "analytics": "4e526b02-0000-443b-9b88-80e95fed8a26"
+    "analytics": "a8fe1576-cfc2-4b2b-9d56-15f41fbd4e10"
   }
 }

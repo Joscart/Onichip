@@ -1,0 +1,36 @@
+<section class="registromascota-section">
+  <div class="registromascota-container animate-in">
+    <div class="registromascota-title">Registrar Mascota</div>
+    <form [formGroup]="mascotaForm" (ngSubmit)="registrarMascota()">
+      <div class="form-group">
+        <label for="nombre">Nombre</label>
+        <input id="nombre" type="text" formControlName="nombre" class="form-control" placeholder="Nombre de la mascota" [class.invalid]="mascotaForm.get('nombre')?.invalid && mascotaForm.get('nombre')?.touched" />
+      </div>
+      <div class="form-group">
+        <label for="especie">Especie</label>
+        <select id="especie" formControlName="especie" class="form-control" [class.invalid]="mascotaForm.get('especie')?.invalid && mascotaForm.get('especie')?.touched">
+          <option value="" disabled selected>Selecciona especie</option>
+          <option *ngFor="let especie of especies" [value]="especie">{{ especie }}</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="raza">Raza</label>
+        <input id="raza" type="text" formControlName="raza" class="form-control" placeholder="Raza" [class.invalid]="mascotaForm.get('raza')?.invalid && mascotaForm.get('raza')?.touched" />
+      </div>
+      <div class="form-group">
+        <label for="edad">Edad</label>
+        <input id="edad" type="number" formControlName="edad" class="form-control" placeholder="Edad" min="0" max="40" [class.invalid]="mascotaForm.get('edad')?.invalid && mascotaForm.get('edad')?.touched" />
+      </div>
+      <div class="form-group">
+        <label for="deviceId">ID del Dispositivo (opcional)</label>
+        <input id="deviceId" type="text" formControlName="deviceId" class="form-control" placeholder="ID físico del dispositivo (opcional)" />
+      </div>
+      <div class="error-msg" *ngIf="errorMsg">{{ errorMsg }}</div>
+      <div class="success-msg" *ngIf="successMsg">{{ successMsg }}</div>
+      <button class="registromascota-btn" type="submit" [disabled]="loading">{{ loading ? 'Registrando...' : 'Registrar Mascota' }}</button>
+    </form>
+    <div class="back-link">
+      <a routerLink="/homeusuario" (click)="volverAlDashboard()">&larr; Volver al dashboard</a>
+    </div>
+  </div>
+</section>

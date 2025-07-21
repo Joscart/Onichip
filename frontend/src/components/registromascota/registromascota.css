@@ -1,0 +1,103 @@
+/* Pet registration page styles */
+.registromascota-section {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(120deg, #eae6fa 0%, #faf8ff 100%);
+}
+.registromascota-container {
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 4px 32px rgba(94,33,187,0.10);
+  padding: 40px 32px 32px 32px;
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: fadeInUp 0.7s cubic-bezier(.23,1.01,.32,1) both;
+}
+.registromascota-title {
+  font-size: 2rem;
+  font-weight: 900;
+  color: #5e21bb;
+  margin-bottom: 24px;
+  text-align: center;
+}
+.form-group {
+  width: 100%;
+  margin-bottom: 18px;
+  display: flex;
+  flex-direction: column;
+}
+.form-group label {
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: #5e21bb;
+}
+.form-group input,
+.form-group select {
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1.5px solid #d1c4e9;
+  font-size: 1rem;
+  outline: none;
+  transition: border 0.2s;
+}
+.form-group input:focus,
+.form-group select:focus {
+  border-color: #5e21bb;
+}
+.form-group input.invalid,
+.form-group select.invalid {
+  border-color: #e53935;
+}
+.error-msg {
+  color: #e53935;
+  margin-bottom: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+.success-msg {
+  color: #43a047;
+  margin-bottom: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+.registromascota-btn {
+  width: 100%;
+  margin-top: 8px;
+  background: #5e21bb;
+  color: #fff;
+  font-weight: 700;
+  border: none;
+  border-radius: 10px;
+  padding: 12px 0;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.registromascota-btn:disabled {
+  background: #bdb2ff;
+  cursor: not-allowed;
+}
+.back-link {
+  margin-top: 18px;
+  font-size: 0.98rem;
+  color: #5e21bb;
+}
+.back-link a {
+  color: #4a1896;
+  text-decoration: underline;
+  font-weight: 600;
+}
+@keyframes fadeInUp {
+  0% { opacity: 0; transform: translateY(40px); }
+  100% { opacity: 1; transform: none; }
+}
+@media (max-width: 500px) {
+  .registromascota-container {
+    padding: 24px 8px 18px 8px;
+  }
+}

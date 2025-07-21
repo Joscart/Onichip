@@ -1,0 +1,90 @@
+<div class="recovery-container">
+  <div class="recovery-card animate-in">
+    <!-- Paso 1: Validar Email -->
+    <div *ngIf="currentStep === 'email'" class="recovery-step">
+      <div class="recovery-header">
+        <span class="emoji">🔐</span>
+        <h2>Recuperar Contraseña</h2>
+        <p>Ingresa tu correo electrónico para validar tu cuenta.</p>
+      </div>
+      
+      <form [formGroup]="emailForm" (ngSubmit)="validarEmail()">
+        <div class="form-group">
+          <label for="email">Correo electrónico</label>
+          <input 
+            id="email" 
+            type="email" 
+            formControlName="email" 
+            placeholder="usuario@email.com" 
+            [class.invalid]="email?.invalid && email?.touched" 
+          />
+        </div>
+        
+        <div class="error-msg" *ngIf="errorMsg">{{ errorMsg }}</div>
+        <div class="success-msg" *ngIf="successMsg">{{ successMsg }}</div>
+        
+        <button type="submit" [disabled]="loading" class="recovery-btn">
+          <span class="emoji" *ngIf="!loading">🔍</span>
+          {{ loading ? 'Validando...' : 'Validar correo electrónico' }}
+        </button>
+      </form>
+    </div>
+
+    <!-- Paso 2: Cambiar Contraseña -->
+    <div *ngIf="currentStep === 'password'" class="recovery-step">
+      <div class="recovery-header">
+        <span class="emoji">🔑</span>
+        <h2>Nueva Contraseña</h2>
+        <p>Ingresa tu nueva contraseña para <strong>{{ emailValidado }}</strong></p>
+      </div>
+      
+      <form [formGroup]="passwordForm" (ngSubmit)="actualizarContrasena()">
+        <div class="form-group">
+          <label for="nuevaContrasena">Nueva contraseña</label>
+          <input 
+            id="nuevaContrasena" 
+            type="password" 
+            formControlName="nuevaContrasena" 
+            placeholder="Mínimo 6 caracteres"
+            [class.invalid]="nuevaContrasena?.invalid && nuevaContrasena?.touched" 
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="confirmarContrasena">Confirmar contraseña</label>
+          <input 
+            id="confirmarContrasena" 
+            type="password" 
+            formControlName="confirmarContrasena" 
+            placeholder="Confirma tu nueva contraseña"
+            [class.invalid]="confirmarContrasena?.invalid && confirmarContrasena?.touched" 
+          />
+        </div>
+        
+        <div class="error-msg" *ngIf="errorMsg">{{ errorMsg }}</div>
+        <div class="success-msg" *ngIf="successMsg">{{ successMsg }}</div>
+        
+        <button type="submit" [disabled]="loading" class="recovery-btn">
+          <span class="emoji" *ngIf="!loading">✅</span>
+          {{ loading ? 'Actualizando...' : 'Actualizar contraseña' }}
+        </button>
+
+        <button type="button" (click)="volverAEmail()" class="secondary-btn">
+          <span class="emoji">←</span> Cambiar correo electrónico
+        </button>
+      </form>
+    </div>
+    
+    <div class="auth-links">
+      <div class="back-link">
+        <a routerLink="/acceso" (click)="volverAlLogin()">
+          <span class="emoji">←</span> Volver al inicio de sesión
+        </a>
+      </div>
+      <div class="register-link">
+        ¿No tienes cuenta? 
+        <a routerLink="/registro">Regístrate aquí</a>
+      </div>
+    </div>
+  </div>
+</div>

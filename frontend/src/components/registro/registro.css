@@ -1,0 +1,323 @@
+/* 🎨 Registro page styles with professional navbar */
+.registro-section {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(120deg, #eae6fa 0%, #faf8ff 100%);
+  position: relative;
+}
+
+/* 🚀 BARRA DE NAVEGACIÓN PROFESIONAL */
+.top-navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(124, 58, 237, 0.1);
+  z-index: 1000;
+  padding: 0;
+  box-shadow: 0 4px 32px rgba(124, 58, 237, 0.08);
+}
+
+.navbar-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.brand-section {
+  display: flex;
+  align-items: center;
+}
+
+.logo-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo-icon {
+  font-size: 2.5em;
+  background: linear-gradient(135deg, #7c3aed, #a855f7);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: drop-shadow(0 2px 4px rgba(124, 58, 237, 0.3));
+  animation: logoFloat 3s ease-in-out infinite;
+}
+
+@keyframes logoFloat {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-5px) rotate(2deg); }
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.brand-name {
+  font-size: 2.2em;
+  font-weight: 900;
+  background: linear-gradient(135deg, #7c3aed, #a855f7);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin: 0;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.brand-slogan {
+  font-size: 0.9em;
+  color: #6b7280;
+  font-weight: 500;
+  margin: 0;
+  font-style: italic;
+  opacity: 0.8;
+}
+
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.home-btn {
+  background: linear-gradient(135deg, #7c3aed, #a855f7);
+  color: white;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 12px;
+  font-size: 0.95em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 16px rgba(124, 58, 237, 0.25);
+}
+
+.home-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(124, 58, 237, 0.35);
+  background: linear-gradient(135deg, #8b5cf6, #a855f7);
+}
+
+.home-icon {
+  font-size: 1.1em;
+  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.5));
+}
+
+/* 📱 CONTENIDO PRINCIPAL */
+.main-content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 100px 20px 40px;
+  min-height: calc(100vh - 80px);
+}
+
+.registro-container {
+  background: #fff;
+  border-radius: 24px;
+  box-shadow: 0 4px 32px rgba(124, 58, 237, 0.10);
+  padding: 40px 32px 32px 32px;
+  max-width: 400px;
+  width: 100%;
+  animation: fadeInUp 0.7s cubic-bezier(.23,1.01,.32,1) both;
+  position: relative;
+}
+
+.registro-title {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #7c3aed;
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.form-group {
+  margin-bottom: 18px;
+}
+
+.form-group label {
+  font-weight: 600;
+  color: #22223b;
+  margin-bottom: 6px;
+  display: block;
+}
+
+.form-control {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #d1c4e9;
+  border-radius: 12px;
+  font-size: 1rem;
+  outline: none;
+  transition: all 0.3s ease;
+  background: white;
+}
+
+.form-control:focus {
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+}
+
+.form-control.invalid {
+  border-color: #e53935;
+}
+
+.error-msg {
+  color: #e53935;
+  margin-bottom: 12px;
+  font-weight: 600;
+  text-align: center;
+  background: rgba(239, 68, 68, 0.1);
+  padding: 12px;
+  border-radius: 8px;
+  border-left: 4px solid #e53935;
+}
+
+.success-msg {
+  color: #10b981;
+  margin-bottom: 12px;
+  font-weight: 600;
+  text-align: center;
+  background: rgba(16, 185, 129, 0.1);
+  padding: 12px;
+  border-radius: 8px;
+  border-left: 4px solid #10b981;
+}
+
+.registro-btn {
+  width: 100%;
+  background: linear-gradient(135deg, #7c3aed, #a855f7);
+  color: white;
+  border: none;
+  padding: 14px 24px;
+  border-radius: 12px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 16px rgba(124, 58, 237, 0.3);
+  margin-top: 8px;
+}
+
+.registro-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(124, 58, 237, 0.4);
+}
+
+.registro-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.login-link {
+  text-align: center;
+  margin-top: 24px;
+  font-size: 0.98rem;
+  color: #6b7280;
+}
+
+.login-link a {
+  color: #7c3aed;
+  text-decoration: none;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.login-link a:hover {
+  color: #5b21b6;
+  text-decoration: underline;
+}
+
+@keyframes fadeInUp {
+  0% { opacity: 0; transform: translateY(40px); }
+  100% { opacity: 1; transform: none; }
+}
+
+/* 📱 RESPONSIVE DESIGN */
+@media (max-width: 768px) {
+  .navbar-content {
+    padding: 12px 16px;
+    flex-direction: column;
+    gap: 12px;
+    text-align: center;
+  }
+  
+  .brand-name {
+    font-size: 1.8em;
+  }
+  
+  .brand-slogan {
+    font-size: 0.8em;
+  }
+  
+  .logo-icon {
+    font-size: 2em;
+  }
+  
+  .main-content {
+    padding: 140px 20px 40px;
+  }
+}
+
+@media (max-width: 500px) {
+  .registro-container {
+    padding: 24px 18px 18px 18px;
+    margin: 0 10px;
+  }
+  
+  .navbar-content {
+    padding: 10px 12px;
+  }
+  
+  .brand-name {
+    font-size: 1.6em;
+  }
+  
+  .home-btn {
+    padding: 10px 16px;
+    font-size: 0.9em;
+  }
+  
+  .main-content {
+    padding: 120px 10px 30px;
+  }
+}
+
+/* ✨ EFECTOS ADICIONALES */
+.top-navbar::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #7c3aed, transparent);
+  opacity: 0.6;
+}
+
+.registro-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60px;
+  height: 4px;
+  background: linear-gradient(135deg, #7c3aed, #a855f7);
+  border-radius: 0 0 4px 4px;
+}

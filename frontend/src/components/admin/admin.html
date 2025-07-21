@@ -1,0 +1,380 @@
+<!-- 🔐 PANTALLA DE LOGIN -->
+<div *ngIf="!isLoggedIn" class="login-container">
+  <div class="login-card">
+    <div class="login-header">
+      <span class="emoji">🛡️</span>
+      <h2>Panel de Administración</h2>
+      <p>Solo administradores con @onichip.com</p>
+    </div>
+    
+    <form [formGroup]="loginForm" (ngSubmit)="login()">
+      <div class="form-group">
+        <label>Email de administrador</label>
+        <input type="email" formControlName="email" placeholder="admin@onichip.com">
+      </div>
+      
+      <div class="form-group">
+        <label>Contraseña</label>
+        <input type="password" formControlName="password" placeholder="••••••">
+      </div>
+      
+      <div *ngIf="loginError" class="error-msg">{{ loginError }}</div>
+      
+      <button type="submit" [disabled]="loading" class="login-btn">
+        <span *ngIf="!loading">🔓</span>
+        {{ loading ? 'Verificando...' : 'Acceder al Panel' }}
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- 🎛️ PANEL PRINCIPAL DE ADMINISTRACIÓN -->
+<div *ngIf="isLoggedIn" class="admin-panel">
+  <!-- Header del admin -->
+  <header class="admin-header">
+    <div class="header-left">
+      <span class="emoji">🛡️</span>
+      <h1>Panel de Administración</h1>
+    </div>
+    <div class="header-right">
+      <span class="admin-info">
+        <span class="emoji">👨‍💼</span>
+        {{ adminData?.nombre }} ({{ adminData?.rol }})
+      </span>
+      <button (click)="logout()" class="logout-btn">
+        <span class="emoji">🚪</span> Cerrar Sesión
+      </button>
+    </div>
+  </header>
+
+  <!-- Navegación por pestañas -->
+  <nav class="admin-nav">
+    <button 
+      [class.active]="activeTab === 'dashboard'" 
+      (click)="setActiveTab('dashboard')"
+      class="nav-btn">
+      <span class="emoji">📊</span> Dashboard
+    </button>
+    <button 
+      [class.active]="activeTab === 'usuarios'" 
+      (click)="setActiveTab('usuarios')"
+      class="nav-btn">
+      <span class="emoji">👥</span> Usuarios
+    </button>
+    <button 
+      [class.active]="activeTab === 'mascotas'" 
+      (click)="setActiveTab('mascotas')"
+      class="nav-btn">
+      <span class="emoji">🐕</span> Mascotas
+    </button>
+  </nav>
+
+  <!-- Contenido principal -->
+  <main class="admin-content">
+    
+    <!-- 📊 DASHBOARD -->
+    <div *ngIf="activeTab === 'dashboard'" class="dashboard-tab">
+      <!-- Estadísticas rápidas -->
+      <div class="stats-grid">
+        <div class="stat-card primary">
+          <span class="emoji">👥</span>
+          <div class="stat-info">
+            <h3>{{ stats.totalUsuarios || 0 }}</h3>
+            <p>Total Usuarios</p>
+            <small>+{{ stats.nuevosUsuarios30d || 0 }} este mes</small>
+          </div>
+        </div>
+        
+        <div class="stat-card success">
+          <span class="emoji">🐕</span>
+          <div class="stat-info">
+            <h3>{{ stats.totalMascotas || 0 }}</h3>
+            <p>Total Mascotas</p>
+            <small>+{{ stats.nuevasMascotas30d || 0 }} este mes</small>
+          </div>
+        </div>
+        
+        <div class="stat-card warning">
+          <span class="emoji">📈</span>
+          <div class="stat-info">
+            <h3>{{ ((stats.nuevosUsuarios30d || 0) * 100 / (stats.totalUsuarios || 1)).toFixed(1) }}%</h3>
+            <p>Crecimiento</p>
+            <small>Últimos 30 días</small>
+          </div>
+        </div>
+        
+        <div class="stat-card info">
+          <span class="emoji">🎯</span>
+          <div class="stat-info">
+            <h3>{{ ((stats.totalMascotas || 0) / (stats.totalUsuarios || 1)).toFixed(1) }}</h3>
+            <p>Mascotas/Usuario</p>
+            <small>Promedio</small>
+          </div>
+        </div>
+      </div>
+
+      <!-- Alertas del sistema -->
+      <div class="alerts-section">
+        <h3><span class="emoji">🚨</span> Alertas del Sistema</h3>
+        <div class="alerts-grid">
+          <div *ngFor="let alerta of alertas" [class]="'alert ' + getAlertClass(alerta.tipo)">
+            <span class="emoji">{{ alerta.icono }}</span>
+            <div class="alert-content">
+              <h4>{{ alerta.titulo }}</h4>
+              <p>{{ alerta.mensaje }}</p>
+            </div>
+          </div>
+          <div *ngIf="alertas.length === 0" class="alert alert-success">
+            <span class="emoji">✅</span>
+            <div class="alert-content">
+              <h4>Todo en orden</h4>
+              <p>No hay alertas en este momento</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mascotas por especie -->
+      <div class="charts-section">
+        <h3><span class="emoji">📊</span> Distribución de Mascotas</h3>
+        <div class="species-grid">
+          <div *ngFor="let especie of stats.mascotasPorEspecie" class="species-card">
+            <span class="emoji">{{ especie._id === 'Perro' ? '🐕' : especie._id === 'Gato' ? '🐱' : '🐾' }}</span>
+            <h4>{{ especie.count }}</h4>
+            <p>{{ especie._id }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 👥 GESTIÓN DE USUARIOS -->
+    <div *ngIf="activeTab === 'usuarios'" class="usuarios-tab">
+      <div class="tab-header">
+        <h2><span class="emoji">👥</span> Gestión de Usuarios</h2>
+        <div class="tab-actions">
+          <div class="search-box">
+            <input 
+              type="text" 
+              [(ngModel)]="searchTerm" 
+              (keyup.enter)="onSearch()"
+              placeholder="Buscar por nombre o email...">
+            <button (click)="onSearch()">🔍</button>
+          </div>
+          <button (click)="openUsuarioModal()" class="primary-btn">
+            <span class="emoji">➕</span> Nuevo Usuario
+          </button>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Usuario</th>
+              <th>Email</th>
+              <th>Mascotas</th>
+              <th>Registro</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let usuario of usuarios">
+              <td>
+                <span 
+                  class="id-badge" 
+                  [title]="'ID completo: ' + usuario._id">
+                  {{ getShortId(usuario._id) }}
+                </span>
+              </td>
+              <td>
+                <div class="user-info">
+                  <span class="emoji">👤</span>
+                  <strong>{{ usuario.nombre }}</strong>
+                </div>
+              </td>
+              <td>{{ usuario.email }}</td>
+              <td>
+                <span class="badge">{{ usuario.cantidadMascotas || 0 }}</span>
+              </td>
+              <td>{{ formatDate(usuario.createdAt || usuario.fechaRegistro) }}</td>
+              <td>
+                <div class="action-buttons">
+                  <button (click)="openUsuarioModal(usuario)" class="edit-btn">✏️</button>
+                  <button (click)="deleteUsuario(usuario._id)" class="delete-btn">🗑️</button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pagination">
+        <button (click)="prevPage()" [disabled]="usuariosPage <= 1">← Anterior</button>
+        <span>Página {{ usuariosPage }}</span>
+        <button (click)="nextPage()">Siguiente →</button>
+      </div>
+    </div>
+
+    <!-- 🐕 GESTIÓN DE MASCOTAS -->
+    <div *ngIf="activeTab === 'mascotas'" class="mascotas-tab">
+      <div class="tab-header">
+        <h2><span class="emoji">🐕</span> Gestión de Mascotas</h2>
+        <div class="tab-actions">
+          <div class="search-box">
+            <input 
+              type="text" 
+              [(ngModel)]="searchTerm" 
+              (keyup.enter)="onSearch()"
+              placeholder="Buscar por nombre o especie...">
+            <button (click)="onSearch()">🔍</button>
+          </div>
+          <button (click)="openMascotaModal()" class="primary-btn">
+            <span class="emoji">➕</span> Nueva Mascota
+          </button>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Mascota</th>
+              <th>Especie</th>
+              <th>Raza</th>
+              <th>Edad</th>
+              <th>Propietario</th>
+              <th>Registro</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let mascota of mascotas">
+              <td>
+                <span 
+                  class="id-badge" 
+                  [title]="'ID completo: ' + mascota._id">
+                  {{ getShortId(mascota._id) }}
+                </span>
+              </td>
+              <td>
+                <div class="pet-info">
+                  <span class="emoji">{{ mascota.especie === 'Perro' ? '🐕' : '🐱' }}</span>
+                  <strong>{{ mascota.nombre }}</strong>
+                </div>
+              </td>
+              <td>{{ mascota.especie }}</td>
+              <td>{{ mascota.raza }}</td>
+              <td>{{ mascota.edad }} años</td>
+              <td>{{ mascota.propietario?.nombre || 'N/A' }}</td>
+              <td>{{ formatDate(mascota.createdAt) }}</td>
+              <td>
+                <div class="action-buttons">
+                  <button (click)="openMascotaModal(mascota)" class="edit-btn">✏️</button>
+                  <button (click)="deleteMascota(mascota._id)" class="delete-btn">🗑️</button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pagination">
+        <button (click)="prevPage()" [disabled]="mascotasPage <= 1">← Anterior</button>
+        <span>Página {{ mascotasPage }}</span>
+        <button (click)="nextPage()">Siguiente →</button>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- 📝 MODAL USUARIO -->
+<div *ngIf="showUsuarioModal" class="modal-overlay" (click)="closeUsuarioModal()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>{{ editingUsuario ? 'Editar Usuario' : 'Nuevo Usuario' }}</h3>
+      <button (click)="closeUsuarioModal()" class="close-btn">✕</button>
+    </div>
+    
+    <form [formGroup]="usuarioForm" (ngSubmit)="saveUsuario()">
+      <div class="form-group">
+        <label>Nombre completo</label>
+        <input type="text" formControlName="nombre" placeholder="Juan Pérez">
+      </div>
+      
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" formControlName="email" placeholder="usuario@email.com">
+      </div>
+      
+      <div class="form-group">
+        <label>{{ editingUsuario ? 'Nueva contraseña (opcional)' : 'Contraseña' }}</label>
+        <input type="password" formControlName="password" placeholder="••••••">
+      </div>
+      
+      <div class="form-group">
+        <label>Teléfono</label>
+        <input type="tel" formControlName="telefono" placeholder="+1234567890">
+      </div>
+      
+      <div class="modal-actions">
+        <button type="button" (click)="closeUsuarioModal()" class="secondary-btn">Cancelar</button>
+        <button type="submit" [disabled]="usuarioForm.invalid || loading" class="primary-btn">
+          {{ loading ? 'Guardando...' : 'Guardar' }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- 📝 MODAL MASCOTA -->
+<div *ngIf="showMascotaModal" class="modal-overlay" (click)="closeMascotaModal()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>{{ editingMascota ? 'Editar Mascota' : 'Nueva Mascota' }}</h3>
+      <button (click)="closeMascotaModal()" class="close-btn">✕</button>
+    </div>
+    
+    <form [formGroup]="mascotaForm" (ngSubmit)="saveMascota()">
+      <div class="form-group">
+        <label>Nombre de la mascota</label>
+        <input type="text" formControlName="nombre" placeholder="Firulais">
+      </div>
+      
+      <div class="form-group">
+        <label>Especie</label>
+        <select formControlName="especie">
+          <option value="">Seleccionar especie</option>
+          <option value="Perro">Perro</option>
+          <option value="Gato">Gato</option>
+          <option value="Ave">Ave</option>
+          <option value="Otro">Otro</option>
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label>Raza</label>
+        <input type="text" formControlName="raza" placeholder="Labrador">
+      </div>
+      
+      <div class="form-group">
+        <label>Edad (años)</label>
+        <input type="number" formControlName="edad" min="0" max="30">
+      </div>
+      
+      <div class="form-group">
+        <label>Propietario (ID)</label>
+        <input type="text" formControlName="propietario" placeholder="ID del usuario">
+      </div>
+      
+      <div class="modal-actions">
+        <button type="button" (click)="closeMascotaModal()" class="secondary-btn">Cancelar</button>
+        <button type="submit" [disabled]="mascotaForm.invalid || loading" class="primary-btn">
+          {{ loading ? 'Guardando...' : 'Guardar' }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

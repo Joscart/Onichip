@@ -1,0 +1,80 @@
+
+<nav class="navbar">
+  <div class="navbar-brand">Onichip</div>
+  <div class="navbar-actions">
+    <button (click)="refreshData()" [disabled]="loading" title="Actualizar datos">
+      🔄 {{ loading ? 'Cargando...' : 'Actualizar' }}
+    </button>
+    <button (click)="registrarMascota()">Registrar Mascota</button>
+    <button (click)="logout()">Cerrar Sesión</button>
+  </div>
+</nav>
+
+<div class="dashboard-container">
+  <!-- Mensaje de bienvenida -->
+  <div class="welcome-section" *ngIf="!loading">
+    <div class="welcome-message">
+      <h1>
+        <span class="text-gradient">{{ getGreetingMessage() }}</span>
+        <span class="emoji">{{ getGreetingEmoji() }}</span>
+      </h1>
+      <p class="welcome-subtitle">
+        {{ getWelcomeSubtitle() }}
+      </p>
+    </div>
+  </div>
+
+
+  <div *ngIf="loading" class="skeleton-loader">
+    <div class="skeleton-card" *ngFor="let i of [1,2]">
+      <div class="skeleton-img"></div>
+      <div class="skeleton-lines">
+        <div class="skeleton-line"></div>
+        <div class="skeleton-line short"></div>
+        <div class="skeleton-line"></div>
+      </div>
+    </div>
+  </div>
+
+  <div *ngIf="!loading && mascotas.length === 0" class="no-mascotas">
+    <div class="empty-state">
+      <div class="empty-icon">🐾</div>
+      <h3>No tienes mascotas registradas aún</h3>
+      <p>Registra tu primera mascota para comenzar a monitorear sus signos vitales</p>
+      <button (click)="registrarMascota()" class="primary-btn">Registrar Primera Mascota</button>
+    </div>
+  </div>
+
+  <div *ngIf="!loading && mascotas.length > 0" class="mascotas-list">
+    <div *ngFor="let mascota of mascotas" class="mascota-card animate-in">
+      <div class="mascota-img-container">
+        <img [src]="getPetImage(mascota)" alt="Mascota" class="mascota-img" />
+      </div>
+      <div class="mascota-info">
+        <div class="mascota-row"><span class="emoji">🐾</span> <strong>Nombre:</strong> {{ mascota.nombre }}</div>
+        <div class="mascota-row"><span class="emoji">🦴</span> <strong>Raza:</strong> {{ mascota.raza }}</div>
+        <div class="mascota-row"><span class="emoji">🎂</span> <strong>Edad:</strong> {{ mascota.edad }} años</div>
+        <div class="mascota-row"><span class="emoji">📅</span> <strong>Última actualización:</strong> {{ mascota.fechaSignos }}</div>
+        <div class="vital-signs">
+          <ng-container *ngIf="mascota.signosVitales && mascota.signosVitales.length > 0; else sinSignos">
+            <div><span class="emoji">💓</span> <strong>FC:</strong> {{ mascota.signosVitales[0].valor }} <span *ngIf="mascota.signosVitales[0].tipo === 'FC'"></span></div>
+            <div><span class="emoji">🌡️</span> <strong>Temp:</strong> {{ mascota.signosVitales[1]?.valor || 'Conecte el dispositivo' }} <span *ngIf="mascota.signosVitales[1]?.tipo === 'Temp'"></span></div>
+            <div><span class="emoji">🫁</span> <strong>FR:</strong> {{ mascota.signosVitales[2]?.valor || 'Conecte el dispositivo' }} <span *ngIf="mascota.signosVitales[2]?.tipo === 'FR'"></span></div>
+          </ng-container>
+          <ng-template #sinSignos>
+            <div><span class="emoji">💓</span> <strong>FC:</strong> Conecte el dispositivo</div>
+            <div><span class="emoji">🌡️</span> <strong>Temp:</strong> Conecte el dispositivo</div>
+            <div><span class="emoji">🫁</span> <strong>FR:</strong> Conecte el dispositivo</div>
+          </ng-template>
+        </div>
+        <div class="device-info">
+          <span class="emoji">🔗</span> <strong>ID Dispositivo:</strong> {{ mascota.deviceId || 'No asociado' }}
+          <button (click)="asociarDispositivo(mascota)" class="asociar-btn">{{ mascota.deviceId ? 'Editar' : 'Asociar' }} Dispositivo</button>
+        </div>
+        <div class="gps-info">
+          <span class="emoji">📍</span> <strong>GPS:</strong> {{ mascota.gps || 'Sin datos' }}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

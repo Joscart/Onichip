@@ -1,2 +1,12 @@
-@import 'bootstrap/dist/css/bootstrap.min.css';
-/* You can add global styles to this file, and also import other style files */
+/* Fuente global Montserrat (Bershka) */
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;900&display=swap');
+* {
+  font-family: 'Montserrat', Arial, sans-serif;
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background-color: #fafafa;
+  color: #111;
+}

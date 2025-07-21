@@ -1,0 +1,62 @@
+<div class="login-container">
+  <!-- 🚀 BARRA DE NAVEGACIÓN PROFESIONAL -->
+  <nav class="top-navbar">
+    <div class="navbar-content">
+      <div class="brand-section">
+        <div class="logo-container">
+          <span class="logo-icon">🐾</span>
+          <div class="brand-text">
+            <h1 class="brand-name">OniChip</h1>
+            <p class="brand-slogan">Conectando corazones, protegiendo patitas</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="nav-actions">
+        <button (click)="irAInicio()" class="home-btn">
+          <span class="home-icon">🏠</span>
+          Inicio
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 🔐 CONTENIDO PRINCIPAL -->
+  <div class="main-content">
+    <div class="login-card animate-in">
+      <h2>Iniciar Sesión</h2>
+      <form [formGroup]="loginForm" (ngSubmit)="login()">
+        <div class="form-group">
+          <label for="email">Correo electrónico</label>
+          <input id="email" type="email" formControlName="email" placeholder="usuario@email.com" [class.invalid]="loginForm.get('email')?.invalid && loginForm.get('email')?.touched" />
+        </div>
+        <div class="form-group">
+          <label for="password">Contraseña</label>
+          <input id="password" type="password" formControlName="password" placeholder="Contraseña" [class.invalid]="loginForm.get('password')?.invalid && loginForm.get('password')?.touched" />
+        </div>
+        <div class="error-msg" *ngIf="errorMsg">{{ errorMsg }}</div>
+        <button type="submit" [disabled]="loading" class="login-btn">{{ loading ? 'Ingresando...' : 'Ingresar' }}</button>
+      </form>
+
+      <!-- Enlaces de navegación -->
+      <div class="auth-links">
+        <div class="register-link">
+          ¿No tienes cuenta?
+          <a routerLink="/registro" (click)="irARegistro()">Regístrate aquí</a>
+        </div>
+        <div class="recovery-link">
+          ¿Olvidaste tu contraseña?
+          <a routerLink="/recuperacion" (click)="irARecuperacion()">Recupérala aquí</a>
+        </div>
+      </div>
+
+      <!-- Botón de administrador -->
+      <div class="admin-section">
+        <button type="button" (click)="irAAdmin()" class="admin-btn">
+          <span class="admin-icon">🛡️</span>
+          Ingresar como Administrador
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

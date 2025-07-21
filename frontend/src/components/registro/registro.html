@@ -1,0 +1,50 @@
+<section class="registro-section">
+  <!-- 🚀 BARRA DE NAVEGACIÓN PROFESIONAL -->
+  <nav class="top-navbar">
+    <div class="navbar-content">
+      <div class="brand-section">
+        <div class="logo-container">
+          <span class="logo-icon">🐾</span>
+          <div class="brand-text">
+            <h1 class="brand-name">OniChip</h1>
+            <p class="brand-slogan">Conectando corazones, protegiendo patitas</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="nav-actions">
+        <button (click)="irAInicio()" class="home-btn">
+          <span class="home-icon">🏠</span>
+          Inicio
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 📝 CONTENIDO PRINCIPAL -->
+  <div class="main-content">
+    <div class="registro-container animate-in">
+      <div class="registro-title">Crear cuenta</div>
+      <form [formGroup]="registroForm" (ngSubmit)="registrar()">
+        <div class="form-group">
+          <label for="nombre">Usuario</label>
+          <input id="nombre" type="text" formControlName="nombre" class="form-control" placeholder="Tu usuario" [class.invalid]="registroForm.get('nombre')?.invalid && registroForm.get('nombre')?.touched" />
+        </div>
+        <div class="form-group">
+          <label for="email">Correo electrónico</label>
+          <input id="email" type="email" formControlName="email" class="form-control" placeholder="usuario@email.com" [class.invalid]="registroForm.get('email')?.invalid && registroForm.get('email')?.touched" />
+        </div>
+        <div class="form-group">
+          <label for="password">Contraseña</label>
+          <input id="password" type="password" formControlName="password" class="form-control" placeholder="Contraseña" [class.invalid]="registroForm.get('password')?.invalid && registroForm.get('password')?.touched" />
+        </div>
+        <div class="error-msg" *ngIf="errorMsg">{{ errorMsg }}</div>
+        <div class="success-msg" *ngIf="successMsg">{{ successMsg }}</div>
+        <button class="registro-btn" type="submit" [disabled]="loading">{{ loading ? 'Registrando...' : 'Registrarse' }}</button>
+      </form>
+      <div class="login-link">
+        ¿Ya tienes cuenta? <a routerLink="/acceso">Inicia sesión aquí</a>
+      </div>
+    </div>
+  </div>
+</section>
