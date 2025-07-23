@@ -1,4 +1,4 @@
-<<!-- Header profesional con navegación -->
+<!-- Header profesional con navegación -->
 <header class="navbar">
   <div class="nav-container">
     <div class="logo">
@@ -22,8 +22,8 @@
           <span class="brand-gradient">Onichip</span>
         </h1>
         <p class="hero-description">
-          La plataforma más avanzada para monitorear signos vitales y ubicación GPS de tus mascotas en tiempo real.
-          Mantén a tus compañeros peludos seguros y saludables desde cualquier lugar.
+          La plataforma más avanzada para rastreo GPS de tus mascotas en tiempo real.
+          Mantén a tus compañeros peludos seguros y siempre localizados desde cualquier lugar.
         </p>
         <div class="hero-buttons">
           <a routerLink="/registro" class="cta-primary">
@@ -36,33 +36,37 @@
         <div class="hero-stats">
           <div class="stat">
             <span class="stat-number">24/7</span>
-            <span class="stat-label">Monitoreo</span>
+            <span class="stat-label">Rastreo</span>
           </div>
           <div class="stat">
             <span class="stat-number">GPS</span>
             <span class="stat-label">En tiempo real</span>
           </div>
           <div class="stat">
-            <span class="stat-number">❤️</span>
-            <span class="stat-label">Signos vitales</span>
+            <span class="stat-number">🛡️</span>
+            <span class="stat-label">Zonas seguras</span>
           </div>
         </div>
       </div>
       <div class="hero-image">
         <div class="image-container">
-          <img src="assets/toby.png" alt="Mascota feliz con Onichip" class="main-image" />
-          <div class="floating-card vital-card">
-            <span class="emoji">💓</span>
-            <div class="card-info">
-              <span class="card-label">Frecuencia cardíaca</span>
-              <span class="card-value">85 BPM</span>
-            </div>
-          </div>
+          <img src="assets/toby.png" alt="Mascota feliz con Onichip" class="main-image" 
+               loading="lazy" 
+               width="400" 
+               height="300" 
+               style="max-width: 100%; height: auto;" />
           <div class="floating-card gps-card">
             <span class="emoji">📍</span>
             <div class="card-info">
               <span class="card-label">Ubicación</span>
               <span class="card-value">Casa segura</span>
+            </div>
+          </div>
+          <div class="floating-card tracking-card">
+            <span class="emoji">🛰️</span>
+            <div class="card-info">
+              <span class="card-label">Estado GPS</span>
+              <span class="card-value">Activo</span>
             </div>
           </div>
         </div>
@@ -76,23 +80,10 @@
   <div class="features-container">
     <div class="section-header">
       <h2>¿Por qué elegir <span class="brand-text">Onichip</span>?</h2>
-      <p>Tecnología avanzada para el cuidado integral de tus mascotas</p>
+      <p>Tecnología avanzada para el rastreo GPS de tus mascotas</p>
     </div>
     
     <div class="features-grid">
-      <div class="feature-card">
-        <div class="feature-icon vitals-icon">
-          <span class="emoji">🫀</span>
-        </div>
-        <h3>Signos Vitales</h3>
-        <p>Monitoreo continuo de temperatura, ritmo cardíaco y respiración. Detecta anomalías antes de que se conviertan en problemas serios.</p>
-        <ul class="feature-list">
-          <li>Temperatura corporal</li>
-          <li>Frecuencia cardíaca</li>
-          <li>Ritmo respiratorio</li>
-        </ul>
-      </div>
-      
       <div class="feature-card">
         <div class="feature-icon gps-icon">
           <span class="emoji">🛰️</span>
@@ -111,57 +102,25 @@
           <span class="emoji">🚨</span>
         </div>
         <h3>Alertas Inteligentes</h3>
-        <p>Notificaciones automáticas sobre cambios en la salud o ubicación. Mantente informado sin revisar constantemente.</p>
+        <p>Notificaciones automáticas sobre cambios en la ubicación. Mantente informado sin revisar constantemente.</p>
         <ul class="feature-list">
-          <li>Alertas de salud</li>
+          <li>Alertas de zona segura</li>
           <li>Notificaciones de ubicación</li>
-          <li>Recordatorios de cuidado</li>
+          <li>Recordatorios de batería</li>
         </ul>
       </div>
-    </div>
-  </div>
-</section>
 
-<!-- Sección de monitoreo de signos vitales -->
-<section class="vitals-showcase">
-  <div class="showcase-container">
-    <div class="showcase-content">
-      <div class="showcase-text">
-        <h2>
-          <span class="emoji">💓</span>
-          Monitoreo de signos vitales
-          <span class="highlight">en tiempo real</span>
-        </h2>
-        <p class="showcase-description">
-          Con la tecnología Onichip, puedes supervisar la salud de tu mascota las 24 horas del día. 
-          Nuestros sensores avanzados proporcionan datos precisos y confiables.
-        </p>
-        <div class="vitals-features">
-          <div class="vital-item">
-            <span class="emoji">🌡️</span>
-            <div>
-              <strong>Temperatura</strong>
-              <span>Control térmico continuo</span>
-            </div>
-          </div>
-          <div class="vital-item">
-            <span class="emoji">💓</span>
-            <div>
-              <strong>Frecuencia cardíaca</strong>
-              <span>Detección de arritmias</span>
-            </div>
-          </div>
-          <div class="vital-item">
-            <span class="emoji">🫁</span>
-            <div>
-              <strong>Respiración</strong>
-              <span>Monitoreo respiratorio</span>
-            </div>
-          </div>
+      <div class="feature-card">
+        <div class="feature-icon map-icon">
+          <span class="emoji">🗺️</span>
         </div>
-      </div>
-      <div class="showcase-image">
-        <img src="assets/home3.png" alt="Monitoreo de signos vitales" />
+        <h3>Mapas Interactivos</h3>
+        <p>Visualiza la ubicación de tu mascota en mapas detallados. Revisa rutas y patrones de actividad diaria.</p>
+        <ul class="feature-list">
+          <li>Mapas en tiempo real</li>
+          <li>Historial de actividad</li>
+          <li>Análisis de patrones</li>
+        </ul>
       </div>
     </div>
   </div>
@@ -215,8 +174,8 @@
 <!-- Call to Action final -->
 <section class="cta-section">
   <div class="cta-container">
-    <h2>¿Listo para cuidar mejor a tu mascota?</h2>
-    <p>Únete a miles de dueños que ya confían en Onichip para mantener a sus mascotas seguras y saludables.</p>
+    <h2>¿Listo para mantener a tu mascota siempre localizada?</h2>
+    <p>Únete a miles de dueños que ya confían en Onichip para mantener a sus mascotas seguras y siempre localizadas.</p>
     <div class="cta-buttons">
       <a routerLink="/registro" class="cta-primary large">
         <span class="emoji">🐾</span> Crear cuenta gratis
@@ -236,7 +195,7 @@
         <span class="emoji">🐾</span>
         <span>Onichip</span>
       </div>
-      <p>© 2025 Onichip. Cuidando a tus mascotas con tecnología avanzada.</p>
+      <p>© 2025 Onichip. Mantén a tus mascotas siempre localizadas con tecnología GPS avanzada.</p>
     </div>
   </div>
 </footer>

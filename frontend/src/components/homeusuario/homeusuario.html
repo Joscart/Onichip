@@ -1,12 +1,12 @@
 
 <nav class="navbar">
-  <div class="navbar-brand">Onichip</div>
+  <div class="navbar-brand">🗺️ Onichip GPS</div>
   <div class="navbar-actions">
-    <button (click)="refreshData()" [disabled]="loading" title="Actualizar datos">
+    <button (click)="refreshData()" [disabled]="loading" title="Actualizar ubicaciones">
       🔄 {{ loading ? 'Cargando...' : 'Actualizar' }}
     </button>
-    <button (click)="registrarMascota()">Registrar Mascota</button>
-    <button (click)="logout()">Cerrar Sesión</button>
+    <button (click)="registrarMascota()">➕ Registrar Mascota</button>
+    <button (click)="logout()">🚪 Cerrar Sesión</button>
   </div>
 </nav>
 
@@ -15,15 +15,14 @@
   <div class="welcome-section" *ngIf="!loading">
     <div class="welcome-message">
       <h1>
-        <span class="text-gradient">{{ getGreetingMessage() }}</span>
-        <span class="emoji">{{ getGreetingEmoji() }}</span>
+        <span class="text-gradient">📍 Rastreador GPS</span>
+        <span class="emoji">🐾</span>
       </h1>
       <p class="welcome-subtitle">
-        {{ getWelcomeSubtitle() }}
+        Monitorea la ubicación de tus mascotas en tiempo real
       </p>
     </div>
   </div>
-
 
   <div *ngIf="loading" class="skeleton-loader">
     <div class="skeleton-card" *ngFor="let i of [1,2]">
@@ -38,10 +37,10 @@
 
   <div *ngIf="!loading && mascotas.length === 0" class="no-mascotas">
     <div class="empty-state">
-      <div class="empty-icon">🐾</div>
+      <div class="empty-icon">�️</div>
       <h3>No tienes mascotas registradas aún</h3>
-      <p>Registra tu primera mascota para comenzar a monitorear sus signos vitales</p>
-      <button (click)="registrarMascota()" class="primary-btn">Registrar Primera Mascota</button>
+      <p>Registra tu primera mascota para comenzar a rastrear su ubicación GPS</p>
+      <button (click)="registrarMascota()" class="primary-btn">📍 Registrar Primera Mascota</button>
     </div>
   </div>
 
@@ -49,30 +48,152 @@
     <div *ngFor="let mascota of mascotas" class="mascota-card animate-in">
       <div class="mascota-img-container">
         <img [src]="getPetImage(mascota)" alt="Mascota" class="mascota-img" />
+        <div class="status-indicator" [class]="getLocationStatus(mascota)">
+          <span class="status-dot"></span>
+        </div>
       </div>
       <div class="mascota-info">
-        <div class="mascota-row"><span class="emoji">🐾</span> <strong>Nombre:</strong> {{ mascota.nombre }}</div>
-        <div class="mascota-row"><span class="emoji">🦴</span> <strong>Raza:</strong> {{ mascota.raza }}</div>
-        <div class="mascota-row"><span class="emoji">🎂</span> <strong>Edad:</strong> {{ mascota.edad }} años</div>
-        <div class="mascota-row"><span class="emoji">📅</span> <strong>Última actualización:</strong> {{ mascota.fechaSignos }}</div>
-        <div class="vital-signs">
-          <ng-container *ngIf="mascota.signosVitales && mascota.signosVitales.length > 0; else sinSignos">
-            <div><span class="emoji">💓</span> <strong>FC:</strong> {{ mascota.signosVitales[0].valor }} <span *ngIf="mascota.signosVitales[0].tipo === 'FC'"></span></div>
-            <div><span class="emoji">🌡️</span> <strong>Temp:</strong> {{ mascota.signosVitales[1]?.valor || 'Conecte el dispositivo' }} <span *ngIf="mascota.signosVitales[1]?.tipo === 'Temp'"></span></div>
-            <div><span class="emoji">🫁</span> <strong>FR:</strong> {{ mascota.signosVitales[2]?.valor || 'Conecte el dispositivo' }} <span *ngIf="mascota.signosVitales[2]?.tipo === 'FR'"></span></div>
-          </ng-container>
-          <ng-template #sinSignos>
-            <div><span class="emoji">💓</span> <strong>FC:</strong> Conecte el dispositivo</div>
-            <div><span class="emoji">🌡️</span> <strong>Temp:</strong> Conecte el dispositivo</div>
-            <div><span class="emoji">🫁</span> <strong>FR:</strong> Conecte el dispositivo</div>
+        <div class="mascota-header">
+          <h3>{{ mascota.nombre }}</h3>
+          <span class="pet-type">{{ getPetTypeIcon(mascota.tipo) }} {{ mascota.tipo }}</span>
+        </div>
+        
+        <div class="mascota-row">
+          <span class="emoji">🦴</span> 
+          <strong>Raza:</strong> {{ mascota.raza }}
+        </div>
+        
+        <div class="mascota-row">
+          <span class="emoji">🎂</span> 
+          <strong>Edad:</strong> {{ mascota.edad }} años
+        </div>
+        
+        <!-- Información GPS -->
+        <div class="gps-section">
+          <div class="section-header">
+            <h4>📍 Ubicación GPS</h4>
+            <span class="last-update">{{ getLastLocationUpdate(mascota) }}</span>
+          </div>
+          
+          <div class="location-info" *ngIf="mascota.ubicacionActual; else noLocation">
+            <div class="location-row">
+              <span class="emoji">�️</span>
+              <strong>Método:</strong> 
+              <span class="method-badge" [class]="mascota.ubicacionActual.method?.toLowerCase()">
+                {{ mascota.ubicacionActual.method || 'GPS' }}
+              </span>
+            </div>
+            
+            <div class="location-row">
+              <span class="emoji">�</span>
+              <strong>Precisión:</strong> {{ mascota.ubicacionActual.accuracy || 'N/A' }}m
+            </div>
+            
+            <div class="location-row">
+              <span class="emoji">🏃</span>
+              <strong>Velocidad:</strong> {{ mascota.ubicacionActual.speed || 0 }} km/h
+            </div>
+            
+            <div class="location-row" *ngIf="mascota.dispositivo?.bateria">
+              <span class="emoji">🔋</span>
+              <strong>Batería:</strong> 
+              <div class="battery-bar">
+                <div class="battery-level" [style.width.%]="mascota.dispositivo.bateria.nivel">
+                  {{ mascota.dispositivo.bateria.nivel }}%
+                </div>
+              </div>
+            </div>
+            
+            <div class="coordinates">
+              <small>
+                📍 {{ mascota.ubicacionActual.latitude?.toFixed(6) }}, 
+                {{ mascota.ubicacionActual.longitude?.toFixed(6) }}
+              </small>
+            </div>
+          </div>
+          
+          <ng-template #noLocation>
+            <div class="no-location">
+              <span class="emoji">❌</span>
+              <span>Sin datos GPS - Verifique la conexión del dispositivo</span>
+            </div>
           </ng-template>
         </div>
-        <div class="device-info">
-          <span class="emoji">🔗</span> <strong>ID Dispositivo:</strong> {{ mascota.deviceId || 'No asociado' }}
-          <button (click)="asociarDispositivo(mascota)" class="asociar-btn">{{ mascota.deviceId ? 'Editar' : 'Asociar' }} Dispositivo</button>
+        
+        <!-- Información del dispositivo -->
+        <div class="device-section">
+          <div class="section-header">
+            <h4>📱 Dispositivo</h4>
+          </div>
+          
+          <div class="device-row">
+            <span class="emoji">🔗</span>
+            <strong>ID:</strong> {{ mascota.dispositivo?.id || 'No asociado' }}
+          </div>
+          
+          <div class="device-row" *ngIf="mascota.dispositivo?.ultimaConexion">
+            <span class="emoji">�</span>
+            <strong>Última conexión:</strong> {{ mascota.dispositivo.ultimaConexion | date:'short' }}
+          </div>
+          
+          <button (click)="asociarDispositivo(mascota)" class="asociar-btn">
+            {{ mascota.dispositivo?.id ? '✏️ Editar' : '🔗 Asociar' }} Dispositivo
+          </button>
         </div>
-        <div class="gps-info">
-          <span class="emoji">📍</span> <strong>GPS:</strong> {{ mascota.gps || 'Sin datos' }}
+        
+        <!-- Estadísticas de ubicación -->
+        <div class="stats-section" *ngIf="mascota.estadisticas">
+          <div class="section-header">
+            <h4>📊 Estadísticas</h4>
+          </div>
+          
+          <div class="stats-grid">
+            <div class="stat-item">
+              <span class="stat-value">{{ mascota.estadisticas.distanciaRecorrida || 0 }}</span>
+              <span class="stat-label">km recorridos</span>
+            </div>
+            
+            <div class="stat-item">
+              <span class="stat-value">{{ mascota.estadisticas.tiempoActivo || 0 }}</span>
+              <span class="stat-label">horas activo</span>
+            </div>
+            
+            <div class="stat-item">
+              <span class="stat-value">{{ mascota.estadisticas.zonasVisitadas || 0 }}</span>
+              <span class="stat-label">zonas visitadas</span>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Acciones -->
+        <div class="action-buttons">
+          <button (click)="verMapa(mascota)" class="action-btn primary">
+            🗺️ Ver en Mapa
+          </button>
+          <button (click)="verHistorial(mascota)" class="action-btn secondary">
+            📈 Historial
+          </button>
+          <button (click)="configurarGeofences(mascota)" class="action-btn secondary">
+            🔲 Geofences
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal del mapa -->
+  <div class="modal-overlay" *ngIf="showMapModal" (click)="closeMapModal()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>🗺️ Ubicación de {{ selectedMascota?.nombre }}</h3>
+        <button class="close-btn" (click)="closeMapModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="map-placeholder">
+          <h4>📍 Mapa GPS</h4>
+          <p>Funcionalidad de mapa próximamente disponible</p>
+          <p><strong>Mascota:</strong> {{ selectedMascota?.nombre }}</p>
+          <p><strong>ID:</strong> {{ selectedMascota?._id }}</p>
         </div>
       </div>
     </div>

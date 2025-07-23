@@ -5,6 +5,25 @@ const morgan = require('morgan');
 const cors = require('cors');
 const mongoose = require('./src/database');
 
+// Importar y registrar modelos explícitamente
+const Usuario = require('./src/models/usuario');
+const Mascota = require('./src/models/mascota');
+const Admin = require('./src/models/admin');
+const Recuperacion = require('./src/models/recuperacion');
+const DatosIoT = require('./src/models/datosiot');
+const { Ubicacion, Geofence, WifiLocationCache } = require('./src/models/ubicacion');
+
+console.log('✅ Modelos registrados:', {
+  Usuario: !!Usuario,
+  Mascota: !!Mascota,
+  Admin: !!Admin,
+  Recuperacion: !!Recuperacion,
+  DatosIoT: !!DatosIoT,
+  Ubicacion: !!Ubicacion,
+  Geofence: !!Geofence,
+  WifiLocationCache: !!WifiLocationCache
+});
+
 // Habilitar CORS
 app.use(cors());
 
@@ -19,10 +38,14 @@ app.use(express.text());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// 🗺️ RUTAS GPS Y GEOFENCING (NUEVAS)
+app.use('/api/gps', require('./src/routes/gps.routes'));
+app.use('/api/geofences', require('./src/routes/geofence.routes'));
 
-
-// Rutas de mascotas
+// Rutas existentes
 app.use('/api', require('./src/routes/mascotas.routes'));
+// Rutas de dispositivos ESP32
+app.use('/api', require('./src/routes/device.routes'));
 // Ruta de geolocalización por WiFi
 app.use('/api', require('./src/routes/geoloc.routes'));
 // Rutas de usuarios

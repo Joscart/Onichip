@@ -1,4 +1,6 @@
-// ====================== tracker.ino ======================
+// ====================== GPS_TRACKER.ino ======================
+// 🗺️ SISTEMA DE RASTREO GPS ONICHIP
+// Funciones principales: GPS + WiFi Fallback + Geofencing
 
 // Selección de módem SIM800 para TinyGSM
 #define TINY_GSM_MODEM_SIM800
@@ -11,12 +13,12 @@
 #include <SoftwareSerial.h>
 #include <HTTPClient.h>
 #include <SPIFFS.h>
+#include <WiFi.h>
+#include <ArduinoJson.h>
 
 #define TINY_GSM_RX_BUFFER 1024
 
-
 // UART y cliente TinyGSM
-
 HardwareSerial SerialAT(2);
 TinyGsm        modem(SerialAT);
 TinyGsmClient  client(modem);
@@ -24,20 +26,34 @@ TinyGPSPlus gps;
 SoftwareSerial ss(GPS_TX_PIN, GPS_RX_PIN); // GPS TX → ESP32 RX, GPS RX ← ESP32 TX
 
 // Configuración API (ver config.h)
-#include "config.h"
 String deviceId = DEVICE_ID;
 String apiBase = API_BASE;
 
-// =================== [TEST WIFI SECTION - REMOVE FOR PRODUCTION] ===================
-  // Modular: solo incluye y llama si TEST_WIFI está definido
-#define TEST_WIFI
+// =================== [WIFI GPS FALLBACK] ===================
+#define TEST_WIFI;
 #include "test.h"
-// =================== [END TEST WIFI SECTION] ===================
+#include <WiFi.h>
+String wifiApiKey = ""; // Se configurará desde el servidor
+bool useWifiLocation = false;
+// =================== [END WIFI GPS FALLBACK] ===================
 
 // Estados de conexión
 enum ConnStatus { CONN_OK = 0, NO_NETWORK, GPRS_FAIL };
+enum LocationMethod { GPS_ONLY, WIFI_FALLBACK, HYBRID_MODE };
 
-// Protos
+// Estructura para datos GPS mejorados
+struct LocationData {
+    float latitude;
+    float longitude;
+    float speed;
+    float accuracy;
+    int satellites;
+    LocationMethod method;
+    bool isValid;
+    unsigned long timestamp;
+};
+
+// Protos GPS y WiFi
 bool        setPowerBoostKeepOn(bool en);
 float       readBatteryLevel();
 bool        readChargingStatus();
@@ -45,9 +61,11 @@ ConnStatus  checkConnection();
 void        reconnect();
 void        blinkError(int code);
 void        blinkConnected();
-bool        readGps(float &lat, float &lon, float &speedKmh);
-void        readData(float &lat, float &lon, float &speedKmh,
-                     int &vitals, float &batV, bool &charging);
+bool        readGPS(LocationData &location); // GPS principal
+bool        getWiFiLocation(LocationData &location); // WiFi fallback
+bool        readLocationHybrid(LocationData &location); // Método híbrido
+void        sendLocationData(LocationData &location);
+void        readAllData(LocationData &location, float &batV, bool &charging);
 void        sendData(float lat, float lon, float speedKmh,
                      int vitals, float batV, bool charging);
 
@@ -104,28 +122,46 @@ void setup() {
 }
 
 void loop() {
-  float lat, lon, speedKmh, batV;
-  int vitals;
+  LocationData location;
+  float batV;
   bool charging;
-  readData(lat, lon, speedKmh, vitals, batV, charging);
+  
+  // Leer todos los datos (ubicación + batería)
+  readAllData(location, batV, charging);
 
   ConnStatus st = checkConnection();
   if (st == CONN_OK) {
     unsigned long lastSend = millis();
     unsigned long sendInterval = 30000; // 30 segundos
+    
     while (checkConnection() == CONN_OK) {
-      float lat2, lon2, speedKmh2, batV2;
-      int vitals2;
-      bool charging2;
-      readData(lat2, lon2, speedKmh2, vitals2, batV2, charging2);
-      String json = buildJson(lat2, lon2, speedKmh2, vitals2, batV2, charging2);
+      LocationData newLocation;
+      float newBatV;
+      bool newCharging;
+      
+      // Leer datos actualizados
+      readAllData(newLocation, newBatV, newCharging);
+      
+      // Construir JSON con los nuevos datos de ubicación
+      String json = buildLocationJson(newLocation, newBatV, newCharging);
+      
+      // Enviar al servidor
       HTTPClient http;
-      http.begin(apiBase + "/dev/" + deviceId);
+      http.begin(apiBase + "/api/device/" + deviceId + "/location");
       http.addHeader("Content-Type", "application/json");
       int httpCode = http.PUT(json);
-      Serial.println("PUT status: " + String(httpCode));
+      
+      if (httpCode == 200) {
+        Serial.println("✅ Ubicación enviada correctamente");
+        blinkConnected();
+      } else {
+        Serial.println("❌ Error enviando ubicación: " + String(httpCode));
+        blinkError(1);
+      }
+      
       http.end();
-      blinkConnected();
+      
+      // Esperar intervalo antes del siguiente envío
       unsigned long now = millis();
       while (millis() - now < sendInterval) {
         delay(100);
@@ -235,63 +271,200 @@ void blinkConnected() {
   delay(OK_OFF_MS);
 }
 
-// - Lectura GPS
-bool readGps(float &lat, float &lon, float &speedKmh) {
-  // Leer datos del GPS usando SoftwareSerial
-  while (ss.available() > 0) {
-    gps.encode(ss.read());
-  }
-  if (gps.location.isValid() && gps.location.age() < 2000) {
-    lat = gps.location.lat();
-    lon = gps.location.lng();
-    speedKmh = gps.speed.kmph();
-    return true;
-  }
+// 🗺️ FUNCIONES GPS MEJORADAS CON WIFI FALLBACK
 
-  String json = String(buildWifiJson());
-  HTTPClient http;
-  http.begin(apiBase+"/geoloc/wifi");
-  http.addHeader("Content-Type", "application/json");
-  int httpCode = http.POST(json);
-  Serial.println("POST status: " + String(httpCode));
-  http.end();
-
-  return false;
+// — Lectura GPS principal
+bool readGPS(LocationData &location) {
+    location.isValid = false;
+    location.method = GPS_ONLY;
+    location.timestamp = millis();
+    
+    // Leer datos GPS durante 2 segundos
+    unsigned long start = millis();
+    while (millis() - start < 2000) {
+        while (ss.available() > 0) {
+            if (gps.encode(ss.read())) {
+                if (gps.location.isValid()) {
+                    location.latitude = gps.location.lat();
+                    location.longitude = gps.location.lng();
+                    location.speed = gps.speed.isValid() ? gps.speed.kmph() : 0.0;
+                    location.accuracy = gps.hdop.isValid() ? gps.hdop.hdop() : 999.0;
+                    location.satellites = gps.satellites.isValid() ? gps.satellites.value() : 0;
+                    location.isValid = true;
+                    location.method = GPS_ONLY;
+                    
+                    Serial.printf("🛰️ GPS: %.6f, %.6f | Vel: %.2f km/h | Sats: %d\n", 
+                                  location.latitude, location.longitude, location.speed, location.satellites);
+                    return true;
+                }
+            }
+        }
+    }
+    
+    Serial.println("❌ GPS no disponible");
+    return false;
 }
 
-String buildWifiJson() {
-  int n = WiFi.scanNetworks();
-  String json = "{\"wifiAccessPoints\":[";
-  for (int i = 0; i < n; i++) {
-    if (i > 0) json += ",";
-    json += "{";
-    json += "\"macAddress\":\"" + WiFi.BSSIDstr(i) + "\",";
-    json += "\"signalStrength\":" + String(WiFi.RSSI(i));
+// — Obtener ubicación vía WiFi (fallback)
+bool getWiFiLocation(LocationData &location) {
+    location.isValid = false;
+    location.method = WIFI_FALLBACK;
+    
+    // Escanear redes WiFi cercanas
+    WiFi.mode(WIFI_STA);
+    int networkCount = WiFi.scanNetworks();
+    
+    if (networkCount == 0) {
+        Serial.println("❌ No hay redes WiFi disponibles");
+        return false;
+    }
+    
+    // Crear JSON para Google Geolocation API
+    String json = "{\"wifiAccessPoints\":[";
+    int validNetworks = 0;
+    
+    for (int i = 0; i < networkCount && validNetworks < 10; i++) {
+        if (WiFi.RSSI(i) > -90) { // Solo redes con buena señal
+            if (validNetworks > 0) json += ",";
+            json += "{";
+            json += "\"macAddress\":\"" + WiFi.BSSIDstr(i) + "\",";
+            json += "\"signalStrength\":" + String(WiFi.RSSI(i));
+            json += "}";
+            validNetworks++;
+        }
+    }
+    json += "]}";
+    
+    if (validNetworks == 0) {
+        Serial.println("❌ No hay redes WiFi válidas para geolocalización");
+        return false;
+    }
+    
+    // Hacer petición al servidor para obtener ubicación
+    HTTPClient http;
+    http.begin(apiBase + "/api/location/wifi");
+    http.addHeader("Content-Type", "application/json");
+    
+    int httpCode = http.POST(json);
+    
+    if (httpCode == 200) {
+        String response = http.getString();
+        
+        // Parse JSON response
+        DynamicJsonDocument doc(1024);
+        deserializeJson(doc, response);
+        
+        if (doc["status"] == "OK") {
+            location.latitude = doc["location"]["lat"];
+            location.longitude = doc["location"]["lng"];
+            location.accuracy = doc["accuracy"];
+            location.speed = 0.0; // WiFi no proporciona velocidad
+            location.satellites = 0;
+            location.isValid = true;
+            location.method = WIFI_FALLBACK;
+            
+            Serial.printf("📶 WiFi Loc: %.6f, %.6f | Precisión: %.0fm\n", 
+                          location.latitude, location.longitude, location.accuracy);
+            
+            http.end();
+            return true;
+        }
+    }
+    
+    http.end();
+    Serial.println("❌ Error en geolocalización WiFi");
+    return false;
+}
+
+// — Método híbrido: GPS primero, WiFi como fallback
+bool readLocationHybrid(LocationData &location) {
+    // Intentar GPS primero
+    if (readGPS(location)) {
+        return true;
+    }
+    
+    // Si GPS falla, usar WiFi
+    Serial.println("🔄 GPS falló, intentando WiFi...");
+    if (getWiFiLocation(location)) {
+        return true;
+    }
+    
+    Serial.println("❌ Ambos métodos de localización fallaron");
+    return false;
+}
+
+// — Función principal de lectura de datos
+void readAllData(LocationData &location, float &batV, bool &charging) {
+    // Leer ubicación con método híbrido
+    bool locationOk = readLocationHybrid(location);
+    
+    // Leer estado de batería
+    batV = readBatteryLevel();
+    charging = readChargingStatus();
+    
+    if (locationOk) {
+        String method = (location.method == GPS_ONLY) ? "GPS" : "WiFi";
+        Serial.printf("📍 %s Loc: %.6f, %.6f | Batería: %.2f V | Carga: %s\n",
+                      method.c_str(), location.latitude, location.longitude, batV,
+                      charging ? "Sí" : "No");
+    } else {
+        Serial.printf("❌ Sin ubicación | Batería: %.2f V | Carga: %s\n",
+                      batV, charging ? "Sí" : "No");
+    }
+}
+
+// — Construir JSON para enviar al servidor
+String buildLocationJson(LocationData &location, float batV, bool charging) {
+    String json = "{";
+    json += "\"deviceId\":\"" + deviceId + "\",";
+    json += "\"timestamp\":" + String(location.timestamp) + ",";
+    
+    if (location.isValid) {
+        json += "\"location\":{";
+        json += "\"latitude\":" + String(location.latitude, 6) + ",";
+        json += "\"longitude\":" + String(location.longitude, 6) + ",";
+        json += "\"accuracy\":" + String(location.accuracy, 2) + ",";
+        json += "\"speed\":" + String(location.speed, 2) + ",";
+        json += "\"satellites\":" + String(location.satellites) + ",";
+        json += "\"method\":\"" + (location.method == GPS_ONLY ? "GPS" : "WiFi") + "\"";
+        json += "},";
+    }
+    
+    json += "\"battery\":{";
+    json += "\"level\":" + String(batV, 2) + ",";
+    json += "\"charging\":" + String(charging ? "true" : "false");
     json += "}";
-  }
-  json += "]}";
-  return json;
+    json += "}";
+    
+    return json;
 }
 
-// — Lectura local e impresión
+// — FUNCIONES ORIGINALES MANTENIDAS PARA COMPATIBILIDAD
+bool readGps(float &lat, float &lon, float &speedKmh) {
+    LocationData location;
+    bool success = readGPS(location);
+    if (success) {
+        lat = location.latitude;
+        lon = location.longitude;
+        speedKmh = location.speed;
+    }
+    return success;
+}
+
 void readData(float &lat, float &lon, float &speedKmh,
               int &vitals, float &batV, bool &charging) {
-
-  bool gpsOk = readGps(lat, lon, speedKmh);
-  vitals   = analogRead(VITALS_PIN);
-  batV     = readBatteryLevel();
-  charging = readChargingStatus();
-
-  if (gpsOk) {
-    Serial.printf(
-      ">> GPS: %.6f, %.6f | Vel: %.2f km/h | Vitales: %d | Batería: %.2f V | Carga: %s\n",
-      lat, lon, speedKmh, vitals, batV,
-      charging ? "Sí" : "No"
-    );
-  } else {
-    Serial.printf(
-      ">> GPS no dispo | Vitales: %d | Batería: %.2f V | Carga: %s\n",
-      vitals, batV, charging ? "Sí" : "No"
-    );
-  }
+    LocationData location;
+    readAllData(location, batV, charging);
+    
+    if (location.isValid) {
+        lat = location.latitude;
+        lon = location.longitude;
+        speedKmh = location.speed;
+    } else {
+        lat = 0.0;
+        lon = 0.0;
+        speedKmh = 0.0;
+    }
+    
+    vitals = 0; // Ya no usamos signos vitales
 }

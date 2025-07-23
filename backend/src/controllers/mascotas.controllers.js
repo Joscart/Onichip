@@ -1,56 +1,56 @@
-const Device = require('../models/mascota');
-const deviceController = {};
+const Mascota = require('../models/mascota');
+const mascotaController = {};
 
-// GET todos los dispositivos
-deviceController.getMascotas = async (req, res) => {
-    const devices = await Device.find();
-    res.json(devices);
+// GET todas las mascotas
+mascotaController.getMascotas = async (req, res) => {
+    const mascotas = await Mascota.find().populate('propietario', 'nombre email');
+    res.json(mascotas);
 };
 
-// GET dispositivo por ID
-deviceController.getMascota = async (req, res) => {
-    const device = await Device.findById(req.params.id);
-    res.json(device);
+// GET mascota por ID
+mascotaController.getMascota = async (req, res) => {
+    const mascota = await Mascota.findById(req.params.id).populate('propietario', 'nombre email');
+    res.json(mascota);
 };
 
-// GET dispositivos por owner
-deviceController.getMascotasByOwner = async (req, res) => {
+// GET mascotas por owner
+mascotaController.getMascotasByOwner = async (req, res) => {
     const ownerId = req.params.ownerId;
-    const devices = await Device.find({ propietario: ownerId });
-    res.json(devices);
+    const mascotas = await Mascota.find({ propietario: ownerId }).populate('propietario', 'nombre email');
+    res.json(mascotas);
 };
 
-// POST nuevo dispositivo (acepta JSON del firmware)
-deviceController.addMascota = async (req, res) => {
+// POST nueva mascota (acepta JSON del firmware o formulario)
+mascotaController.addMascota = async (req, res) => {
     try {
-        const device = new Device(req.body);
-        await device.save();
-        res.json({ message: 'Device agregado exitosamente', device });
+        const mascota = new Mascota(req.body);
+        await mascota.save();
+        res.json({ message: 'Mascota agregada exitosamente', mascota });
     } catch (err) {
-        res.status(400).json({ message: 'Error al agregar device', error: err.message });
+        res.status(400).json({ message: 'Error al agregar mascota', error: err.message });
     }
 };
 
-// PUT actualizar dispositivo por deviceId (acepta JSON del firmware)
-deviceController.editMascota = async (req, res) => {
+// PUT actualizar mascota por deviceId (acepta JSON del firmware)
+mascotaController.editMascota = async (req, res) => {
     const { deviceId } = req.params;
     try {
-        const updated = await Device.findOneAndUpdate(
+        const updated = await Mascota.findOneAndUpdate(
             { deviceId },
             { $set: req.body },
             { new: true, upsert: false }
         );
-        if (!updated) return res.status(404).json({ message: 'Device no encontrado' });
-        res.json({ message: 'Device actualizado exitosamente', device: updated });
+        if (!updated) return res.status(404).json({ message: 'Mascota no encontrada' });
+        res.json({ message: 'Mascota actualizada exitosamente', mascota: updated });
     } catch (err) {
-        res.status(400).json({ message: 'Error al actualizar device', error: err.message });
+        res.status(400).json({ message: 'Error al actualizar mascota', error: err.message });
     }
 };
 
-// DELETE eliminar dispositivo por ID
-deviceController.deleteMascota = async (req, res) => {
-    await Device.findByIdAndDelete(req.params.id);
-    res.json('Device eliminado exitosamente');
+// DELETE eliminar mascota por ID
+mascotaController.deleteMascota = async (req, res) => {
+    await Mascota.findByIdAndDelete(req.params.id);
+    res.json('Mascota eliminada exitosamente');
 };
 
-module.exports = deviceController;
+module.exports = mascotaController;

@@ -1,0 +1,497 @@
+.mapa-gps-container {
+  position: relative;
+  width: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.map-container {
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+}
+
+/* 🔄 Loading Overlay */
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.9);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #e3f2fd;
+  border-top: 4px solid #2196f3;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* 🎛️ Controles del Mapa */
+.map-controls {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 1000;
+}
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.control-btn {
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 8px;
+  background: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.control-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.control-btn.active {
+  background: #2196f3;
+  color: white;
+}
+
+.control-btn.add-btn {
+  background: #4caf50;
+  color: white;
+}
+
+/* 📍 Panel de Información de Ubicación */
+.location-info {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  width: 280px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.info-header {
+  padding: 16px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.info-header h4 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.method-badge {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.method-badge.gps {
+  background: rgba(76, 175, 80, 0.2);
+  color: #4caf50;
+}
+
+.method-badge.wifi {
+  background: rgba(255, 152, 0, 0.2);
+  color: #ff9800;
+}
+
+.method-badge.cell {
+  background: rgba(244, 67, 54, 0.2);
+  color: #f44336;
+}
+
+.info-content {
+  padding: 16px;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.info-row:last-child {
+  margin-bottom: 0;
+}
+
+.info-label {
+  font-size: 13px;
+  color: #666;
+  font-weight: 500;
+}
+
+.info-value {
+  font-size: 13px;
+  color: #333;
+  font-weight: 600;
+}
+
+.battery-indicator {
+  display: inline-block;
+  height: 16px;
+  background: linear-gradient(90deg, #4caf50, #8bc34a);
+  border-radius: 8px;
+  padding: 0 8px;
+  color: white;
+  font-size: 11px;
+  line-height: 16px;
+  min-width: 60px;
+  text-align: center;
+}
+
+/* 🔲 Panel de Creación de Geofence */
+.geofence-creator {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  width: 320px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.creator-header {
+  padding: 16px;
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  color: white;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.creator-header h4 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.close-btn {
+  border: none;
+  background: none;
+  color: white;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+.close-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.creator-content {
+  padding: 20px;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 6px;
+}
+
+.form-group input,
+.form-group select {
+  width: 100%;
+  padding: 10px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: border-color 0.2s ease;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: #2196f3;
+}
+
+.color-picker {
+  height: 44px;
+  padding: 4px !important;
+  cursor: pointer;
+}
+
+.radius-slider {
+  margin-bottom: 8px;
+}
+
+.range-value {
+  font-size: 12px;
+  color: #666;
+  font-weight: 600;
+}
+
+.checkbox-label {
+  display: flex !important;
+  align-items: center;
+  cursor: pointer;
+}
+
+.checkbox-label input {
+  width: auto !important;
+  margin-right: 8px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.btn {
+  flex: 1;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-cancel {
+  background: #f5f5f5;
+  color: #666;
+}
+
+.btn-cancel:hover {
+  background: #e0e0e0;
+}
+
+.btn-save {
+  background: #4caf50;
+  color: white;
+}
+
+.btn-save:hover {
+  background: #45a049;
+  transform: translateY(-1px);
+}
+
+.creator-help {
+  margin-top: 16px;
+  padding: 12px;
+  background: #e3f2fd;
+  border-radius: 8px;
+  border-left: 4px solid #2196f3;
+}
+
+.creator-help p {
+  margin: 0;
+  font-size: 13px;
+  color: #1976d2;
+}
+
+/* 📶 Estado de Conexión */
+.connection-status {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  z-index: 1000;
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+.status-indicator.online .status-dot {
+  background: #4caf50;
+}
+
+.status-indicator.offline .status-dot {
+  background: #ff9800;
+}
+
+.status-indicator.online .status-text {
+  color: #4caf50;
+}
+
+.status-indicator.offline .status-text {
+  color: #ff9800;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.2);
+  }
+}
+
+/* 🎨 Estilos para marcadores de Leaflet */
+:host ::ng-deep .location-marker {
+  background: none !important;
+  border: none !important;
+}
+
+:host ::ng-deep .location-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: white;
+  border-radius: 20px;
+  padding: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+:host ::ng-deep .method-icon {
+  font-size: 18px;
+  margin-bottom: 2px;
+}
+
+:host ::ng-deep .battery-indicator {
+  font-size: 8px;
+  padding: 1px 4px;
+  border-radius: 6px;
+  color: white;
+  font-weight: bold;
+}
+
+:host ::ng-deep .geofence-marker {
+  background: none !important;
+  border: none !important;
+}
+
+:host ::ng-deep .geofence-center {
+  width: 30px;
+  height: 30px;
+  background: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+:host ::ng-deep .temp-marker {
+  background: none !important;
+  border: none !important;
+}
+
+:host ::ng-deep .temp-geofence {
+  width: 30px;
+  height: 30px;
+  background: rgba(255, 107, 107, 0.9);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  animation: pulse 1s infinite;
+}
+
+:host ::ng-deep .route-marker {
+  background: none !important;
+  border: none !important;
+}
+
+:host ::ng-deep .route-point {
+  width: 20px;
+  height: 20px;
+  background: #2196f3;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: white;
+  font-weight: bold;
+}
+
+/* 📱 Responsive */
+@media (max-width: 768px) {
+  .location-info {
+    width: calc(100% - 32px);
+    position: relative;
+    margin-bottom: 16px;
+  }
+  
+  .geofence-creator {
+    width: calc(100% - 32px);
+    position: relative;
+  }
+  
+  .map-controls {
+    top: 8px;
+    right: 8px;
+  }
+  
+  .control-group {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+}

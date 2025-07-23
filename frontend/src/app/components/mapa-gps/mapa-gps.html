@@ -1,0 +1,141 @@
+<div class="mapa-gps-container" [style.height]="height">
+  <!-- Mapa -->
+  <div #mapContainer class="map-container"></div>
+  
+  <!-- Loading overlay -->
+  <div class="loading-overlay" *ngIf="isLoading">
+    <div class="spinner"></div>
+    <p>Cargando ubicaciones...</p>
+  </div>
+
+  <!-- Controles del mapa -->
+  <div class="map-controls" *ngIf="showControls">
+    <div class="control-group">
+      <button 
+        class="control-btn location-btn"
+        [class.active]="autoCenter"
+        (click)="centerOnCurrentLocation()"
+        title="Centrar en ubicación actual">
+        📍
+      </button>
+      
+      <button 
+        class="control-btn"
+        [class.active]="showLocationHistory"
+        (click)="toggleLocationHistory()"
+        title="Mostrar historial de ubicaciones">
+        🛤️
+      </button>
+      
+      <button 
+        class="control-btn"
+        [class.active]="showGeofences"
+        (click)="toggleGeofences()"
+        title="Mostrar geofences">
+        🔲
+      </button>
+      
+      <button 
+        class="control-btn"
+        [class.active]="autoCenter"
+        (click)="toggleAutoCenter()"
+        title="Auto-centrar">
+        🎯
+      </button>
+      
+      <button 
+        class="control-btn add-btn"
+        (click)="startGeofenceCreation()"
+        title="Crear geofence">
+        ➕
+      </button>
+    </div>
+  </div>
+
+  <!-- Panel de información de ubicación actual -->
+  <div class="location-info" *ngIf="currentLocation">
+    <div class="info-header">
+      <h4>📍 Ubicación Actual</h4>
+      <span class="method-badge" [ngClass]="currentLocation.method?.toLowerCase()">
+        {{ currentLocation.method || 'GPS' }}
+      </span>
+    </div>
+    
+    <div class="info-content">
+      <div class="info-row">
+        <span class="info-label">Precisión:</span>
+        <span class="info-value">{{ currentLocation.accuracy || 'N/A' }}m</span>
+      </div>
+      
+      <div class="info-row">
+        <span class="info-label">Velocidad:</span>
+        <span class="info-value">{{ currentLocation.speed || 0 }} km/h</span>
+      </div>
+      
+      <div class="info-row" *ngIf="currentLocation.battery">
+        <span class="info-label">Batería:</span>
+        <span class="info-value">
+          <span class="battery-indicator" [style.width.%]="currentLocation.battery.level">
+            {{ currentLocation.battery.level }}%
+          </span>
+        </span>
+      </div>
+      
+      <div class="info-row">
+        <span class="info-label">Última actualización:</span>
+        <span class="info-value">{{ currentLocation.timestamp | date:'short' }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Panel de creación de geofence -->
+  <div class="geofence-creator" *ngIf="showGeofenceCreator">
+    <div class="creator-header">
+      <h4>🔲 Crear Geofence</h4>
+      <button class="close-btn" (click)="cancelGeofenceCreation()">✕</button>
+    </div>
+    
+    <div class="creator-content">
+      <div class="form-group">
+        <label>Nombre:</label>
+        <input 
+          type="text" 
+          [(ngModel)]="newGeofence.name" 
+          placeholder="Casa, Oficina, Parque...">
+      </div>
+      
+      <div class="form-group">
+        <label>Descripción:</label>
+        <input 
+          type="text" 
+          [(ngModel)]="newGeofence.description" 
+          placeholder="Descripción opcional">
+      </div>
+      
+      <div class="form-actions">
+        <button class="btn btn-cancel" (click)="cancelGeofenceCreation()">
+          Cancelar
+        </button>
+        <button class="btn btn-save" (click)="saveGeofence()">
+          Guardar
+        </button>
+      </div>
+      
+      <div class="creator-help" *ngIf="creatingGeofence">
+        <p>📌 Haz clic en el mapa para seleccionar la ubicación del geofence</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Estado de conexión -->
+  <div class="connection-status" *ngIf="currentLocation">
+    <div class="status-indicator" 
+         [class.online]="currentLocation.method === 'GPS'"
+         [class.offline]="currentLocation.method !== 'GPS'">
+      <span class="status-dot"></span>
+      <span class="status-text">
+        {{ currentLocation.method === 'GPS' ? 'GPS Activo' : 'WiFi/Cell' }}
+      </span>
+    </div>
+  </div>
+</div>

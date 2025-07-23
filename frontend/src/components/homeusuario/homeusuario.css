@@ -1,9 +1,11 @@
+/* 🗺️ ONICHIP GPS - ESTILOS PRINCIPALES */
 body {
-  background: #f8f7fc;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   font-family: 'Montserrat', 'Inter', Arial, sans-serif;
+  min-height: 100vh;
 }
 
-/* Estilos para emojis - forzar colores originales */
+/* Forzar colores originales para emojis */
 .emoji, 
 .welcome-message h1,
 .welcome-subtitle,
@@ -19,24 +21,90 @@ body {
   -webkit-background-clip: initial !important;
 }
 
-.dashboard-container {
-  max-width: 900px;
-  margin: 40px auto;
-  padding: 0 16px;
+/* 🧭 NAVBAR GPS */
+.navbar {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  padding: 16px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
 }
 
-/* Estilos para la sección de bienvenida */
+.navbar-brand {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #2563eb;
+}
+
+.navbar-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.navbar-actions button {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 14px;
+}
+
+.navbar-actions button:first-child {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+.navbar-actions button:first-child:hover {
+  background: #bbdefb;
+  transform: translateY(-1px);
+}
+
+.navbar-actions button:nth-child(2) {
+  background: #4caf50;
+  color: white;
+}
+
+.navbar-actions button:nth-child(2):hover {
+  background: #45a049;
+  transform: translateY(-1px);
+}
+
+.navbar-actions button:last-child {
+  background: #f44336;
+  color: white;
+}
+
+.navbar-actions button:last-child:hover {
+  background: #da190b;
+  transform: translateY(-1px);
+}
+
+/* 📊 DASHBOARD CONTAINER */
+.dashboard-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+
+/* 🎯 SECCIÓN DE BIENVENIDA */
 .welcome-section {
   margin-bottom: 32px;
   text-align: center;
 }
 
 .welcome-message {
-  background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   padding: 32px;
   border-radius: 24px;
-  box-shadow: 0 8px 32px rgba(124, 58, 237, 0.25);
+  box-shadow: 0 8px 32px rgba(102, 126, 234, 0.25);
   margin-bottom: 24px;
 }
 
@@ -47,18 +115,18 @@ body {
   color: white;
 }
 
-/* Aplicar gradiente solo al texto, no a los emojis */
-.welcome-message h1 .text-gradient {
-  background: linear-gradient(45deg, #ffffff, #e2e8f0);
+.text-gradient {
+  background: linear-gradient(45deg, #ffffff 0%, #e8f4fd 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
 .welcome-subtitle {
-  font-size: 1.2rem;
-  font-weight: 400;
+  font-size: 1.1rem;
+  opacity: 0.9;
   margin: 0;
+  color: white;
   opacity: 0.9;
 }
 
@@ -383,5 +451,109 @@ body {
   .mascota-img {
     margin-right: 0;
     margin-bottom: 16px;
+  }
+}
+
+/* 🗺️ MODAL Y PLACEHOLDER DEL MAPA */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: fadeIn 0.3s ease;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 16px;
+  width: 90vw;
+  max-width: 1000px;
+  height: 80vh;
+  max-height: 800px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: slideInScale 0.3s ease;
+}
+
+.modal-header {
+  padding: 20px 24px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+.close-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.modal-body {
+  flex: 1;
+  position: relative;
+}
+
+.map-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 400px;
+  background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+  border-radius: 12px;
+  padding: 40px;
+  text-align: center;
+}
+
+.map-placeholder h4 {
+  font-size: 2rem;
+  color: #1565c0;
+  margin-bottom: 16px;
+}
+
+.map-placeholder p {
+  color: #1976d2;
+  font-size: 1.1rem;
+  margin-bottom: 8px;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
   }
 }

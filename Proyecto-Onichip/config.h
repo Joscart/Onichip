@@ -5,7 +5,7 @@
 
 // Unique identifier for this tracker device
 #define DEVICE_ID    "collar-test"
-#define API_BASE     "http://192.168.0.104:3000/api/device"
+#define API_BASE     "http://172.20.10.7:3000/api"
 
 
 // ————— SIM & GPRS —————
@@ -23,8 +23,8 @@
 #define STATUS_LED_PIN      13
 
 // ————— GPS NEO-6M (GY-GPS6MV2) —————
-#define GPS_TX_PIN          14  // ESP32 RX ← GPS TX
-#define GPS_RX_PIN          12  // ESP32 TX → GPS RX
+#define GPS_TX_PIN          14  // ESP32  RX ← GPS TX blanco  
+#define GPS_RX_PIN          12  // ESP32   TX → GPS RX negro 
 
 // ————— I²C Power (IP5306) —————
 #define I2C_SDA_POWER       21
