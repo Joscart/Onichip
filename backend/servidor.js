@@ -23,10 +23,12 @@ app.use(express.urlencoded({ extended: false }));
 
 // Rutas de mascotas
 app.use('/api', require('./src/routes/mascotas.routes'));
+// Ruta de geolocalización por WiFi
+app.use('/api', require('./src/routes/geoloc.routes'));
 // Rutas de usuarios
 app.use('/api', require('./src/routes/usuarios.routes'));
 // Rutas de recuperación de contraseña
-// app.use('/api', require('./src/routes/recuperacion.routes'));
+app.use('/api', require('./src/routes/recuperacion.routes'));
 // Rutas de administrador
 app.use('/api/admin', require('./src/routes/admin.routes'));
 // Rutas de autenticación

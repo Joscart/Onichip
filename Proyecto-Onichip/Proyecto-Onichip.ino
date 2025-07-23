@@ -7,16 +7,21 @@
 
 #include <Wire.h>
 #include <TinyGsmClient.h>
-
+#include <TinyGPSPlus.h>
+#include <SoftwareSerial.h>
 #include <HTTPClient.h>
 #include <SPIFFS.h>
 
 #define TINY_GSM_RX_BUFFER 1024
 
+
 // UART y cliente TinyGSM
+
 HardwareSerial SerialAT(2);
 TinyGsm        modem(SerialAT);
 TinyGsmClient  client(modem);
+TinyGPSPlus gps;
+SoftwareSerial ss(GPS_TX_PIN, GPS_RX_PIN); // GPS TX → ESP32 RX, GPS RX ← ESP32 TX
 
 // Configuración API (ver config.h)
 #include "config.h"
@@ -80,6 +85,10 @@ void setup() {
   delay(3000);
   Serial.println("Iniciando módem...");
   modem.restart();
+
+  // Configura el GPS (SoftwareSerial)
+  ss.begin(9600);
+  Serial.println("Iniciando GPS...");
 
   // Desbloquea SIM si tiene PIN
   if (strlen(SIM_PIN) && modem.getSimStatus() != 3) {
@@ -171,7 +180,7 @@ bool readChargingStatus() {
 ConnStatus checkConnection() {
   // Prioridad 1: Wi-Fi temporal
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("✅ Conectado vía Wi-Fi");
+    //Serial.println("✅ Conectado vía Wi-Fi");
     return CONN_OK;
   }
 
@@ -228,46 +237,40 @@ void blinkConnected() {
 
 // - Lectura GPS
 bool readGps(float &lat, float &lon, float &speedKmh) {
-  // Método 1: GPS interno
-  modem.sendAT(GF("+CGNSINF"));
-  if (modem.waitResponse(1000L) == 1) {
-    String inf = modem.stream.readStringUntil('\n');
-    int p = 0;
-    for (int i = 0; i < 4; i++) {
-      p = inf.indexOf(',', p + 1);
-      if (p < 0) break;
-    }
-    int p2 = inf.indexOf(',', p + 1);
-    int p3 = inf.indexOf(',', p2 + 1);
-    int p4 = inf.indexOf(',', p3 + 1);
-
-    if (p2 > 0 && p3 > 0 && p4 > 0) {
-      lat      = inf.substring(p + 1, p2).toFloat();
-      lon      = inf.substring(p2 + 1, p3).toFloat();
-      speedKmh = inf.substring(p3 + 1, p4).toFloat();
-      return true;
-    }
+  // Leer datos del GPS usando SoftwareSerial
+  while (ss.available() > 0) {
+    gps.encode(ss.read());
+  }
+  if (gps.location.isValid() && gps.location.age() < 2000) {
+    lat = gps.location.lat();
+    lon = gps.location.lng();
+    speedKmh = gps.speed.kmph();
+    return true;
   }
 
-  // Método 2: Triangulación GSM
-  modem.sendAT("+CIPGSMLOC=1,1");
-  if (modem.waitResponse(10000L) == 1) {
-    String resp = modem.stream.readStringUntil('\n');
-    // Esperado: +CIPGSMLOC: 0,lat,lon,fecha,hora
-    int i1 = resp.indexOf(',');
-    int i2 = resp.indexOf(',', i1 + 1);
-    int i3 = resp.indexOf(',', i2 + 1);
+  String json = String(buildWifiJson());
+  HTTPClient http;
+  http.begin(apiBase+"/geoloc/wifi");
+  http.addHeader("Content-Type", "application/json");
+  int httpCode = http.POST(json);
+  Serial.println("POST status: " + String(httpCode));
+  http.end();
 
-    if (i1 > 0 && i2 > 0 && i3 > 0) {
-      lat = resp.substring(i1 + 1, i2).toFloat();
-      lon = resp.substring(i2 + 1, i3).toFloat();
-      speedKmh = 0;  // GSM no proporciona velocidad
-      return true;
-    }
-  }
-
-  // Si ambos métodos fallan
   return false;
+}
+
+String buildWifiJson() {
+  int n = WiFi.scanNetworks();
+  String json = "{\"wifiAccessPoints\":[";
+  for (int i = 0; i < n; i++) {
+    if (i > 0) json += ",";
+    json += "{";
+    json += "\"macAddress\":\"" + WiFi.BSSIDstr(i) + "\",";
+    json += "\"signalStrength\":" + String(WiFi.RSSI(i));
+    json += "}";
+  }
+  json += "]}";
+  return json;
 }
 
 // — Lectura local e impresión

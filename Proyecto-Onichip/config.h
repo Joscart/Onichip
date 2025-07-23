@@ -22,6 +22,10 @@
 #define MODEM_RX_PIN        26  // ESP32 RX ← SIM800L TX
 #define STATUS_LED_PIN      13
 
+// ————— GPS NEO-6M (GY-GPS6MV2) —————
+#define GPS_TX_PIN          14  // ESP32 RX ← GPS TX
+#define GPS_RX_PIN          12  // ESP32 TX → GPS RX
+
 // ————— I²C Power (IP5306) —————
 #define I2C_SDA_POWER       21
 #define I2C_SCL_POWER       22
