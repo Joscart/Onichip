@@ -6,6 +6,7 @@
 #define TINY_GSM_MODEM_SIM800
 
 #include "config.h"
+#include "gps_config.h"
 
 #include <Wire.h>
 #include <TinyGsmClient.h>
@@ -68,17 +69,34 @@ void        sendLocationData(LocationData &location);
 void        readAllData(LocationData &location, float &batV, bool &charging);
 void        sendData(float lat, float lon, float speedKmh,
                      int vitals, float batV, bool charging);
+void        diagnosticoGPS(); // Diagnóstico GPS NEO-6M
+void        verificarCalibracionGPS(); // Verificación específica de calibración
+bool        testHardware(); // Test inicial de hardware
 
 
 void setup() {
   Serial.begin(115200);
   delay(10);
+  
+  // Mensaje de arranque seguro
+  Serial.println("\n🚀 === ONICHIP GPS TRACKER INICIANDO ===");
+  Serial.println("⚠️  Versión: 2.0 - Boot Seguro");
+  
   SPIFFS.begin(true);
 
   // =================== [TEST WIFI SECTION - REMOVE FOR PRODUCTION] ===================
   // Modular: solo incluye y llama si TEST_WIFI está definido
   connectTestWiFi();
   // =================== [END TEST WIFI SECTION] ===================
+
+  // CRÍTICO: Test de hardware ANTES de cualquier inicialización
+  if (!testHardware()) {
+    Serial.println("❌ FALLO EN TEST DE HARDWARE - DETENIENDO");
+    while(1) {
+      blinkError(5);
+      delay(2000);
+    }
+  }
 
   // IP5306: mantener boost ON
   Wire.begin(I2C_SDA_POWER, I2C_SCL_POWER);
@@ -97,16 +115,71 @@ void setup() {
   // LED de estado
   pinMode(STATUS_LED_PIN, OUTPUT);
   digitalWrite(STATUS_LED_PIN, LOW);
+  
+  Serial.println("🔧 Sistema iniciando - Verificando hardware...");
+  
+  // IMPORTANTE: Dar tiempo al sistema para estabilizarse
+  delay(2000);
+  Serial.println("✅ Sistema estabilizado");
 
   // Inicia UART al SIM800L
   SerialAT.begin(115200, SERIAL_8N1, MODEM_RX_PIN, MODEM_TX_PIN);
   delay(3000);
   Serial.println("Iniciando módem...");
   modem.restart();
-
-  // Configura el GPS (SoftwareSerial)
-  ss.begin(9600);
-  Serial.println("Iniciando GPS...");
+  
+  Serial.println("🛰️ === INICIALIZACIÓN GPS SEGURA ===");
+  
+  // Configurar pines GPS como entrada/salida de forma segura
+  pinMode(GPS_TX_PIN, INPUT);   // Pin que recibe datos del GPS
+  pinMode(GPS_RX_PIN, OUTPUT);  // Pin que envía comandos al GPS
+  digitalWrite(GPS_RX_PIN, HIGH); // Estado idle
+  
+  delay(500); // Pausa para estabilizar
+  
+  // Inicializar SoftwareSerial GPS con configuración segura
+  ss.begin(9600, SWSERIAL_8N1, GPS_TX_PIN, GPS_RX_PIN, false, 256);
+  
+  Serial.printf("✅ GPS inicializado en pines TX:%d RX:%d\n", GPS_TX_PIN, GPS_RX_PIN);
+  Serial.println("📡 Configurando GPS NEO-6M para Ecuador...");
+  
+  // 1. Configurar tasa de actualización (5Hz para tracking rápido)
+  ss.println(CMD_UPDATE_RATE);
+  delay(200);
+  Serial.println("✓ Tasa: 5Hz");
+  
+  // 2. Configurar solo sentencias GPS esenciales (GGA, RMC)
+  ss.println(CMD_NMEA_OUTPUT);
+  delay(200);
+  Serial.println("✓ Sentencias: GGA+RMC");
+  
+  // 3. Activar SBAS para mejor precisión
+  ss.println(CMD_SBAS_ON);
+  delay(200);
+  Serial.println("✓ SBAS: Habilitado");
+  
+  // 4. Configurar para modo tracking dinámico
+  ss.println(CMD_DYNAMIC_MODEL);
+  delay(200);
+  Serial.println("✓ Modo: Tracking dinámico");
+  
+  // 5. Establecer datum WGS84
+  ss.println(CMD_DATUM_WGS84);
+  delay(200);
+  Serial.println("✓ Datum: WGS84");
+  
+  // 6. Configurar antena activa
+  ss.println(CMD_ANTENNA_ON);
+  delay(200);
+  Serial.println("✓ Antena: Activa");
+  
+  Serial.println("✅ GPS NEO-6M configurado para Ecuador - Esperando fix satelital...");
+  
+  // Ejecutar diagnóstico GPS inicial
+  diagnosticoGPS();
+  
+  // Verificar calibración GPS (opcional - descomenta para testing)
+  // verificarCalibracionGPS();
 
   // Desbloquea SIM si tiene PIN
   if (strlen(SIM_PIN) && modem.getSimStatus() != 3) {
@@ -273,35 +346,103 @@ void blinkConnected() {
 
 // 🗺️ FUNCIONES GPS MEJORADAS CON WIFI FALLBACK
 
-// — Lectura GPS principal
+// — Lectura GPS principal con configuración mejorada para NEO-6M
 bool readGPS(LocationData &location) {
     location.isValid = false;
     location.method = GPS_ONLY;
     location.timestamp = millis();
     
-    // Leer datos GPS durante 2 segundos
+    // Timeouts configurables según estado del GPS
+    static bool coldStart = true;
+    unsigned long timeoutMs;
+    
+    if (coldStart) {
+        timeoutMs = GPS_COLD_START_TIMEOUT_MS; // 30s para primer fix
+        Serial.println("🛰️ GPS Cold Start - Buscando satélites...");
+    } else {
+        timeoutMs = GPS_WARM_START_TIMEOUT_MS; // 10s para fix normal
+        Serial.println("🛰️ GPS Warm Start - Actualizando posición...");
+    }
+    
+    // Leer datos GPS durante el tiempo especificado
     unsigned long start = millis();
-    while (millis() - start < 2000) {
+    int lastSatCount = 0;
+    
+    while (millis() - start < timeoutMs) {
         while (ss.available() > 0) {
-            if (gps.encode(ss.read())) {
-                if (gps.location.isValid()) {
-                    location.latitude = gps.location.lat();
-                    location.longitude = gps.location.lng();
-                    location.speed = gps.speed.isValid() ? gps.speed.kmph() : 0.0;
-                    location.accuracy = gps.hdop.isValid() ? gps.hdop.hdop() : 999.0;
-                    location.satellites = gps.satellites.isValid() ? gps.satellites.value() : 0;
-                    location.isValid = true;
-                    location.method = GPS_ONLY;
+            char c = ss.read();
+            
+            #if GPS_RAW_NMEA_ENABLED
+            Serial.print(c); // Debug: mostrar datos NMEA raw
+            #endif
+            
+            if (gps.encode(c)) {
+                // Verificar progreso de satélites
+                if (gps.satellites.isValid()) {
+                    int currentSats = gps.satellites.value();
+                    if (currentSats != lastSatCount) {
+                        Serial.printf("🔍 Satélites: %d/%d ", currentSats, GPS_MIN_SATELLITES);
+                        if (gps.hdop.isValid()) {
+                            Serial.printf("| HDOP: %.2f", gps.hdop.hdop());
+                        }
+                        Serial.println();
+                        lastSatCount = currentSats;
+                    }
+                }
+                
+                // Verificar si tenemos fix válido
+                if (gps.location.isValid() && gps.satellites.isValid()) {
+                    // Verificar calidad del fix
+                    int sats = gps.satellites.value();
+                    float hdop = gps.hdop.isValid() ? gps.hdop.hdop() : 999.0;
                     
-                    Serial.printf("🛰️ GPS: %.6f, %.6f | Vel: %.2f km/h | Sats: %d\n", 
-                                  location.latitude, location.longitude, location.speed, location.satellites);
-                    return true;
+                    if (sats >= GPS_MIN_SATELLITES && hdop <= GPS_MIN_HDOP) {
+                        location.latitude = gps.location.lat();
+                        location.longitude = gps.location.lng();
+                        location.speed = gps.speed.isValid() ? gps.speed.kmph() : 0.0;
+                        location.accuracy = hdop;
+                        location.satellites = sats;
+                        location.isValid = true;
+                        location.method = GPS_ONLY;
+                        
+                        coldStart = false; // GPS ya inicializado
+                        
+                        Serial.printf("🎯 GPS FIX! Lat: %.6f, Lon: %.6f\n", location.latitude, location.longitude);
+                        Serial.printf("📊 Vel: %.2f km/h | Sats: %d | HDOP: %.2f\n", 
+                                      location.speed, sats, hdop);
+                        return true;
+                    } else {
+                        #if GPS_DEBUG_ENABLED
+                        Serial.printf("⚠️ Fix de baja calidad - Sats: %d, HDOP: %.2f\n", sats, hdop);
+                        #endif
+                    }
                 }
             }
         }
+        delay(10); // Pequeña pausa para no saturar el CPU
     }
     
-    Serial.println("❌ GPS no disponible");
+    // Información de estado si no hay fix
+    if (gps.satellites.isValid()) {
+        int sats = gps.satellites.value();
+        Serial.printf("❌ GPS sin fix - Satélites: %d/%d", sats, GPS_MIN_SATELLITES);
+        if (gps.hdop.isValid()) {
+            Serial.printf(" | HDOP: %.2f", gps.hdop.hdop());
+        }
+        Serial.println();
+        
+        if (sats < GPS_MIN_SATELLITES) {
+            Serial.println("💡 Consejo: Mover a área abierta sin obstáculos");
+        }
+    } else {
+        Serial.println("❌ GPS no responde - Verificar conexiones y antena");
+    }
+    
+    #if GPS_DEBUG_ENABLED
+    Serial.printf("📊 GPS Stats - Chars: %d, Sentences: %d, Fails: %d\n",
+                  gps.charsProcessed(), gps.sentencesWithFix(), gps.failedChecksum());
+    #endif
+    
     return false;
 }
 
@@ -426,7 +567,7 @@ String buildLocationJson(LocationData &location, float batV, bool charging) {
         json += "\"accuracy\":" + String(location.accuracy, 2) + ",";
         json += "\"speed\":" + String(location.speed, 2) + ",";
         json += "\"satellites\":" + String(location.satellites) + ",";
-        json += "\"method\":\"" + (location.method == GPS_ONLY ? "GPS" : "WiFi") + "\"";
+        json += "\"method\":\"" + String(location.method == GPS_ONLY ? "GPS" : "WiFi") + "\"";
         json += "},";
     }
     
@@ -467,4 +608,267 @@ void readData(float &lat, float &lon, float &speedKmh,
     }
     
     vitals = 0; // Ya no usamos signos vitales
+}
+
+// — Diagnóstico GPS NEO-6M
+void diagnosticoGPS() {
+    Serial.println("\n🔧 === DIAGNÓSTICO GPS NEO-6M ===");
+    
+    // Test 1: Verificar comunicación serie
+    Serial.println("📡 Test 1: Comunicación serie GPS...");
+    ss.flush();
+    delay(100);
+    
+    unsigned long start = millis();
+    int caracteres = 0;
+    while (millis() - start < 3000) { // 3 segundos
+        if (ss.available()) {
+            char c = ss.read();
+            if (c == '$') Serial.print("\n");
+            Serial.print(c);
+            caracteres++;
+        }
+    }
+    
+    if (caracteres > 0) {
+        Serial.printf("\n✅ GPS respondiendo - %d caracteres recibidos\n", caracteres);
+    } else {
+        Serial.println("\n❌ GPS no responde - Verificar:");
+        Serial.println("   • Conexiones VCC(3.3V), GND, TX(14), RX(12)");
+        Serial.println("   • Antena GPS conectada");
+        Serial.println("   • Módulo alimentado correctamente");
+        return;
+    }
+    
+    // Test 2: Estado de satélites
+    Serial.println("\n📡 Test 2: Estado satelital...");
+    start = millis();
+    while (millis() - start < 5000) { // 5 segundos
+        while (ss.available() > 0) {
+            if (gps.encode(ss.read())) {
+                if (gps.satellites.isValid()) {
+                    Serial.printf("🛰️ Satélites visibles: %d\n", gps.satellites.value());
+                    if (gps.hdop.isValid()) {
+                        Serial.printf("📊 HDOP (precisión): %.2f\n", gps.hdop.hdop());
+                    }
+                    if (gps.location.isValid()) {
+                        Serial.printf("📍 Ubicación: %.6f, %.6f\n", 
+                                      gps.location.lat(), gps.location.lng());
+                        Serial.println("✅ GPS con FIX!");
+                        return;
+                    }
+                }
+            }
+        }
+        delay(100);
+    }
+    
+    // Test 3: Estadísticas GPS
+    Serial.println("\n📊 Estadísticas GPS:");
+    Serial.printf("   • Caracteres procesados: %d\n", gps.charsProcessed());
+    Serial.printf("   • Sentencias válidas: %d\n", gps.sentencesWithFix());
+    Serial.printf("   • Errores checksum: %d\n", gps.failedChecksum());
+    
+    if (gps.charsProcessed() < 100) {
+        Serial.println("⚠️ Pocos datos GPS - Verificar antena y ubicación");
+    }
+    
+    if (gps.satellites.isValid()) {
+        int sats = gps.satellites.value();
+        if (sats < 4) {
+            Serial.printf("⚠️ Insuficientes satélites (%d/4 mín) - Colocar al aire libre\n", sats);
+        }
+    } else {
+        Serial.println("❌ No se detectan satélites - Verificar antena GPS");
+    }
+    
+    Serial.println("🔧 === FIN DIAGNÓSTICO ===\n");
+}
+
+// 🔧 VERIFICACIÓN ESPECÍFICA DE CALIBRACIÓN GPS
+void verificarCalibracionGPS() {
+    Serial.println("\n🎯 === VERIFICACIÓN CALIBRACIÓN GPS ===");
+    
+    unsigned long startTime = millis();
+    int fixCount = 0;
+    float lastLat = 0, lastLon = 0;
+    float totalHDOP = 0;
+    int hdopReadings = 0;
+    int maxSatellites = 0;
+    bool calibracionOK = false;
+    
+    Serial.println("🔄 Monitoreando GPS por 30 segundos...");
+    Serial.println("Indicadores de buena calibración:");
+    Serial.println("  ✅ 4+ satélites");
+    Serial.println("  ✅ HDOP < 2.0");
+    Serial.println("  ✅ Fix estable");
+    Serial.println("  ✅ Coordenadas consistentes\n");
+    
+    while (millis() - startTime < 30000) { // 30 segundos
+        while (ss.available() > 0) {
+            if (gps.encode(ss.read())) {
+                // Verificar satélites
+                if (gps.satellites.isValid()) {
+                    int sats = gps.satellites.value();
+                    if (sats > maxSatellites) maxSatellites = sats;
+                    
+                    Serial.printf("🛰️ Satélites: %d ", sats);
+                    if (sats >= 4) {
+                        Serial.print("✅");
+                    } else {
+                        Serial.print("❌");
+                    }
+                }
+                
+                // Verificar HDOP (precisión)
+                if (gps.hdop.isValid()) {
+                    float hdop = gps.hdop.hdop();
+                    totalHDOP += hdop;
+                    hdopReadings++;
+                    
+                    Serial.printf(" | HDOP: %.2f ", hdop);
+                    if (hdop < 2.0) {
+                        Serial.print("✅");
+                    } else if (hdop < 5.0) {
+                        Serial.print("⚠️");
+                    } else {
+                        Serial.print("❌");
+                    }
+                }
+                
+                // Verificar ubicación
+                if (gps.location.isValid()) {
+                    float lat = gps.location.lat();
+                    float lon = gps.location.lng();
+                    fixCount++;
+                    
+                    Serial.printf(" | Fix: %.6f,%.6f ", lat, lon);
+                    
+                    // Verificar estabilidad de coordenadas
+                    if (lastLat != 0 && lastLon != 0) {
+                        float distance = TinyGPSPlus::distanceBetween(lastLat, lastLon, lat, lon);
+                        if (distance < 10.0) { // Menos de 10m de variación
+                            Serial.print("✅ Estable");
+                        } else if (distance < 50.0) {
+                            Serial.print("⚠️ Variable");
+                        } else {
+                            Serial.print("❌ Inestable");
+                        }
+                    }
+                    
+                    lastLat = lat;
+                    lastLon = lon;
+                } else {
+                    Serial.print(" | Sin Fix ❌");
+                }
+                
+                Serial.println();
+            }
+        }
+        
+        // Mostrar progreso cada 5 segundos
+        if ((millis() - startTime) % 5000 < 100) {
+            int elapsed = (millis() - startTime) / 1000;
+            Serial.printf("⏱️ Tiempo transcurrido: %ds/30s\n", elapsed);
+        }
+        
+        delay(100);
+    }
+    
+    // Análisis final de calibración
+    Serial.println("\n📊 === ANÁLISIS DE CALIBRACIÓN ===");
+    Serial.printf("🛰️ Máximo satélites detectados: %d\n", maxSatellites);
+    Serial.printf("📍 Fixes GPS obtenidos: %d\n", fixCount);
+    
+    if (hdopReadings > 0) {
+        float avgHDOP = totalHDOP / hdopReadings;
+        Serial.printf("📊 HDOP promedio: %.2f\n", avgHDOP);
+        
+        // Evaluación de calibración
+        bool satellitesOK = (maxSatellites >= 4);
+        bool hdopOK = (avgHDOP < 2.5);
+        bool fixesOK = (fixCount > 5);
+        
+        calibracionOK = satellitesOK && hdopOK && fixesOK;
+        
+        Serial.println("\n🎯 ESTADO DE CALIBRACIÓN:");
+        Serial.printf("   Satélites (4+): %s (%d)\n", 
+                     satellitesOK ? "✅ OK" : "❌ FALLO", maxSatellites);
+        Serial.printf("   Precisión (<2.5): %s (%.2f)\n", 
+                     hdopOK ? "✅ OK" : "❌ FALLO", avgHDOP);
+        Serial.printf("   Fixes estables: %s (%d)\n", 
+                     fixesOK ? "✅ OK" : "❌ FALLO", fixCount);
+        
+        if (calibracionOK) {
+            Serial.println("\n🎉 ✅ GPS CORRECTAMENTE CALIBRADO");
+            Serial.println("   El módulo está listo para tracking");
+        } else {
+            Serial.println("\n⚠️ ❌ GPS NECESITA RECALIBRACIÓN");
+            Serial.println("   Recomendaciones:");
+            if (!satellitesOK) Serial.println("   • Colocar al aire libre con cielo despejado");
+            if (!hdopOK) Serial.println("   • Esperar más tiempo para mejor precisión");
+            if (!fixesOK) Serial.println("   • Verificar antena GPS y conexiones");
+        }
+    } else {
+        Serial.println("❌ No se pudieron obtener datos de precisión");
+        Serial.println("   Verificar conexiones y antena GPS");
+    }
+    
+    Serial.println("🎯 === FIN VERIFICACIÓN ===\n");
+}
+
+// — Test inicial de hardware para detectar problemas de arranque
+bool testHardware() {
+    Serial.println("\n🔧 === TEST INICIAL DE HARDWARE ===");
+    
+    // Test 1: Verificar memoria y sistema
+    Serial.printf("💾 Memoria libre: %d bytes\n", ESP.getFreeHeap());
+    Serial.printf("🔄 Frecuencia CPU: %d MHz\n", ESP.getCpuFreqMHz());
+    Serial.printf("⚡ Voltaje de entrada: %.2f V\n", readBatteryLevel());
+    
+    // Test 2: Verificar pines críticos para T-Call v1.4
+    Serial.println("📌 Verificando pines T-Call v1.4...");
+    
+    // Test de pines GPS específicos para T-Call v1.4
+    pinMode(GPS_TX_PIN, INPUT);   // Pin 33 como entrada (recibe del GPS)
+    pinMode(GPS_RX_PIN, OUTPUT);  // Pin 32 como salida (envía al GPS)
+    digitalWrite(GPS_RX_PIN, HIGH);
+    delay(100);
+    
+    Serial.printf("   GPS TX Pin %d (entrada): Disponible\n", GPS_TX_PIN);
+    Serial.printf("   GPS RX Pin %d (salida): Disponible\n", GPS_RX_PIN);
+    
+    // Verificar que los pines no estén en conflicto con SIM800
+    if (GPS_TX_PIN == MODEM_TX_PIN || GPS_TX_PIN == MODEM_RX_PIN ||
+        GPS_RX_PIN == MODEM_TX_PIN || GPS_RX_PIN == MODEM_RX_PIN) {
+        Serial.println("   ❌ ERROR: Conflicto GPS-SIM800");
+        return false;
+    } else {
+        Serial.println("   ✅ Sin conflictos GPS-SIM800");
+    }
+    
+    // Test toggle del pin RX GPS
+    digitalWrite(GPS_RX_PIN, LOW);
+    delay(50);
+    digitalWrite(GPS_RX_PIN, HIGH);
+    Serial.printf("   GPS RX Pin %d: Test toggle OK\n", GPS_RX_PIN);
+    
+    // Test 3: Verificar I2C (batería)
+    Wire.beginTransmission(IP5306_ADDR);
+    int i2cResult = Wire.endTransmission();
+    Serial.printf("   I2C (IP5306): %s\n", i2cResult == 0 ? "OK" : "ERROR");
+    
+    // Test 4: Test LED
+    Serial.println("💡 Test LED (3 parpadeos)...");
+    for(int i = 0; i < 3; i++) {
+        digitalWrite(STATUS_LED_PIN, HIGH);
+        delay(200);
+        digitalWrite(STATUS_LED_PIN, LOW);
+        delay(200);
+    }
+    
+    Serial.println("✅ Test de hardware completado");
+    Serial.println("🔧 === FIN TEST HARDWARE ===\n");
+    
+    return true;
 }

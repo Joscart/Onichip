@@ -1,5 +1,7 @@
+const mongoose = require('mongoose');
 const Mascota = require('../models/mascota');
 const DatosIoT = require('../models/datosiot');
+const { Ubicacion } = require('../models/ubicacion');
 
 const deviceController = {};
 
@@ -265,6 +267,196 @@ deviceController.registerDevice = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Error interno del servidor'
+        });
+    }
+};
+
+// 📍 Endpoint específico para actualizar ubicación (PUT /api/device/:deviceId/location)
+deviceController.updateDeviceLocation = async (req, res) => {
+    try {
+        const { deviceId } = req.params;
+        const { location, battery, timestamp } = req.body;
+        
+        console.log(`📍 Ubicación recibida del device ${deviceId}:`, JSON.stringify(req.body, null, 2));
+        
+        // Buscar mascota por deviceId
+        let mascota = await Mascota.findOne({ 
+            $or: [
+                { 'dispositivo.id': deviceId },
+                { deviceId: deviceId }
+            ]
+        });
+        
+        // Si no existe la mascota, crear una de prueba
+        if (!mascota) {
+            console.log(`🔄 Creando mascota de prueba para dispositivo ${deviceId}`);
+            
+            try {
+                mascota = new Mascota({
+                    deviceId: deviceId,
+                    nombre: `Mascota-${deviceId}`,
+                    especie: 'perro',
+                    raza: 'Dispositivo de Prueba',
+                    edad: 1,
+                    peso: 10,
+                    propietario: new mongoose.Types.ObjectId('507f1f77bcf86cd799439011'),
+                    dispositivo: {
+                        id: deviceId,
+                        tipo: 'collar',
+                        version: '2.0',
+                        ultimaConexion: new Date(),
+                        estadoBateria: {
+                            nivel: 50,
+                            cargando: false,
+                            ultimaActualizacion: new Date()
+                        }
+                    },
+                    configuracion: {
+                        frecuenciaReporte: 30,
+                        alertasActivas: true,
+                        compartirUbicacion: true
+                    }
+                });
+                
+                await mascota.save();
+                console.log(`✅ Mascota de prueba creada: ${mascota.nombre} (ID: ${mascota._id})`);
+            } catch (saveError) {
+                console.error('❌ Error creando mascota de prueba:', saveError);
+                return res.status(500).json({
+                    error: 'Error creando dispositivo de prueba',
+                    details: saveError.message
+                });
+            }
+        }
+        
+        // Actualizar datos de batería siempre
+        if (battery) {
+            const nivelPorcentaje = Math.round(Math.min(100, Math.max(0, ((battery.level - 3.0) / (4.2 - 3.0)) * 100)));
+            
+            // Asegurar que el dispositivo tenga toda la información necesaria
+            if (!mascota.dispositivo) {
+                mascota.dispositivo = {};
+            }
+            
+            // Preservar y actualizar campos del dispositivo
+            mascota.dispositivo.id = deviceId;
+            mascota.dispositivo.tipo = mascota.dispositivo.tipo || 'collar';
+            mascota.dispositivo.version = mascota.dispositivo.version || '2.0';
+            mascota.dispositivo.ultimaConexion = new Date();
+            
+            // Actualizar batería
+            if (!mascota.dispositivo.estadoBateria) {
+                mascota.dispositivo.estadoBateria = {};
+            }
+            mascota.dispositivo.estadoBateria.nivel = nivelPorcentaje;
+            mascota.dispositivo.estadoBateria.cargando = battery.charging || false;
+            mascota.dispositivo.estadoBateria.ultimaActualizacion = new Date();
+            
+            console.log(`🔋 Batería actualizada: ${nivelPorcentaje}% (${battery.level}V) - Cargando: ${battery.charging ? 'Sí' : 'No'}`);
+        }
+        
+        // Solo procesar ubicación si está presente y es válida
+        if (location && location.latitude && location.longitude) {
+            console.log(`📍 Procesando ubicación GPS: ${location.latitude}, ${location.longitude}`);
+            
+            // Crear registro de ubicación en DatosIoT (compatible con sistema existente)
+            const datosIoT = new DatosIoT({
+                mascota: mascota._id,
+                dispositivo: {
+                    id: deviceId,
+                    tipo: 'collar', // Usar enum válido
+                    version: '2.0'
+                },
+                ubicacion: {
+                    latitud: location.latitude,
+                    longitud: location.longitude,
+                    precision: location.accuracy || 10
+                },
+                signosVitales: {
+                    frecuenciaCardiaca: 80, // Valor válido dentro del rango
+                    temperatura: 38.5, // Temperatura normal para perros
+                    actividad: (location.speed || 0) > 1 ? 'corriendo' : 'descanso' // Usar enum válido
+                },
+                ambiente: {
+                    temperaturaAmbiente: 25,
+                    humedad: 60,
+                    calidad_aire: 'buena'
+                },
+                alertas: [],
+                bateria: {
+                    nivel: battery?.level ? Math.min(100, Math.max(0, (battery.level - 3.0) / 1.2 * 100)) : 85,
+                    estimadoHoras: battery?.charging ? 999 : 24
+                },
+                timestamp: timestamp ? new Date(timestamp) : new Date(),
+                sincronizado: true
+            });
+            
+            await datosIoT.save();
+            
+            // También crear registro en tabla Ubicacion
+            const nuevaUbicacion = new Ubicacion({
+                mascota: mascota._id,
+                dispositivo: {
+                    id: deviceId,
+                    tipo: 'collar',
+                    version: '2.0'
+                },
+                location: {
+                    type: 'Point',
+                    coordinates: [location.longitude, location.latitude]
+                },
+                locationData: {
+                    latitude: location.latitude,
+                    longitude: location.longitude,
+                    accuracy: location.accuracy || 10,
+                    speed: location.speed || 0,
+                    satellites: location.satellites || 0,
+                    method: location.method || 'GPS'
+                },
+                battery: {
+                    level: battery ? Math.round(Math.min(100, Math.max(0, ((battery.level - 3.0) / (4.2 - 3.0)) * 100))) : 85,
+                    charging: battery ? battery.charging : false
+                },
+                timestamp: timestamp ? new Date(timestamp) : new Date(),
+                synchronized: true
+            });
+            
+            await nuevaUbicacion.save();
+            
+            // Actualizar ubicación actual de la mascota
+            mascota.ubicacionActual = {
+                latitud: location.latitude,
+                longitud: location.longitude,
+                precision: location.accuracy || 10,
+                timestamp: timestamp ? new Date(timestamp) : new Date(),
+                metodo: location.method || 'GPS'
+            };
+            
+            console.log(`✅ Ubicación GPS guardada para ${mascota.nombre}`);
+        } else {
+            console.log(`⚠️ Sin datos de ubicación válidos, solo actualizando batería`);
+        }
+        
+        await mascota.save();
+        
+        res.json({
+            success: true,
+            message: location ? 'Ubicación y batería actualizadas correctamente' : 'Batería actualizada (sin ubicación GPS)',
+            device: {
+                id: deviceId,
+                nombre: mascota.nombre,
+                battery: battery,
+                location: location || null,
+                timestamp: new Date().toISOString()
+            }
+        });
+        
+    } catch (error) {
+        console.error('❌ Error actualizando ubicación:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error interno del servidor',
+            error: error.message
         });
     }
 };

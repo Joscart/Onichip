@@ -64,7 +64,7 @@ const MascotaSchema = new Schema({
 
 // Índices para optimización
 MascotaSchema.index({ propietario: 1, activo: 1 });
-MascotaSchema.index({ deviceId: 1 });
+// deviceId ya tiene índice único automático por unique: true
 MascotaSchema.index({ 'dispositivo.id': 1 });
 
 module.exports = mongoose.model('Mascota', MascotaSchema);

@@ -5,7 +5,7 @@
 
 // Unique identifier for this tracker device
 #define DEVICE_ID    "collar-test"
-#define API_BASE     "http://172.20.10.7:3000/api"
+#define API_BASE     "http://192.168.230.130:3000"
 
 
 // ————— SIM & GPRS —————
@@ -14,17 +14,18 @@
 #define GPRS_USER           ""                  // Usuario GPRS si aplica
 #define GPRS_PASS           ""                  // Password GPRS si aplica
 
-// ————— TTGO T-Call v1.4 Pins —————
-#define MODEM_RST_PIN       5
-#define MODEM_PWKEY_PIN     4
-#define MODEM_POWERON_PIN   23
+// ————— LILYGO T-Call v1.4 Pins —————
+#define MODEM_RST_PIN       5   // SIM800 Reset
+#define MODEM_PWKEY_PIN     4   // SIM800 Power Key  
+#define MODEM_POWERON_PIN   23  // SIM800 Power On
 #define MODEM_TX_PIN        27  // ESP32 TX → SIM800L RX
 #define MODEM_RX_PIN        26  // ESP32 RX ← SIM800L TX
-#define STATUS_LED_PIN      13
+#define STATUS_LED_PIN      13  // LED integrado
 
-// ————— GPS NEO-6M (GY-GPS6MV2) —————
-#define GPS_TX_PIN          14  // ESP32  RX ← GPS TX blanco  
-#define GPS_RX_PIN          12  // ESP32   TX → GPS RX negro 
+// ————— GPS NEO-6M - Pines disponibles en T-Call v1.4 —————
+// Pines seguros y disponibles en T-Call v1.4:
+#define GPS_TX_PIN          33  // ESP32 RX ← GPS TX (datos del GPS)
+#define GPS_RX_PIN          32  // ESP32 TX → GPS RX (comandos al GPS) 
 
 // ————— I²C Power (IP5306) —————
 #define I2C_SDA_POWER       21
