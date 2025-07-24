@@ -163,7 +163,7 @@ sudo netstat -tuln | grep -E ':80|:3000|:27017'
 
 # Health checks
 curl http://localhost:80/health
-curl http://localhost:3000/api/info
+curl http://18.223.160.105:3000/api/info
 ```
 
 ### Monitor en tiempo real

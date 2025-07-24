@@ -37,7 +37,7 @@ app.use((req, res, next) => {
 
 // CORS configurado para comunicación con backend
 app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', 'http://localhost:3000');
+  res.setHeader('Access-Control-Allow-Origin', 'http://18.223.160.105:3000');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -80,7 +80,7 @@ app.get('/api/info', (req, res) => {
     version: '1.0.0',
     environment: process.env.NODE_ENV || 'production',
     port: PORT,
-    backend: 'http://localhost:3000'
+    backend: 'http://18.223.160.105:3000'
   });
 });
 
@@ -136,7 +136,7 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   console.log('🌐 ================================');
   console.log(`🚀 Servidor corriendo en puerto: ${PORT}`);
   console.log(`📁 Sirviendo desde: ${DIST_PATH}`);
-  console.log(`🔗 Backend esperado en: http://localhost:3000`);
+  console.log(`🔗 Backend esperado en: http://18.223.160.105:3000`);
   console.log(`🌍 Acceso público: http://0.0.0.0:${PORT}`);
   console.log(`💻 Entorno: ${process.env.NODE_ENV || 'production'}`);
   console.log(`⚡ PID: ${process.pid}`);

@@ -206,7 +206,7 @@ export class Admin implements OnInit, AfterViewInit {
       setTimeout(async () => {
         try {
           // Cargar estadísticas GPS desde el nuevo endpoint
-          const statsRes = await fetch('http://localhost:3000/api/admin/estadisticas-gps');
+          const statsRes = await fetch('http://18.223.160.105:3000/api/admin/estadisticas-gps');
           if (statsRes.ok) {
             const gpsStats = await statsRes.json();
             console.log('📊 Stats GPS cargadas:', gpsStats);
@@ -350,8 +350,8 @@ export class Admin implements OnInit, AfterViewInit {
   private async loadSecondaryData() {
     try {
       const [alertasRes, reportesRes] = await Promise.all([
-        fetch('http://localhost:3000/api/admin/datos-iot?limit=5').catch(() => null),
-        fetch('http://localhost:3000/api/admin/dashboard-charts').catch(() => null)
+        fetch('http://18.223.160.105:3000/api/admin/datos-iot?limit=5').catch(() => null),
+        fetch('http://18.223.160.105:3000/api/admin/dashboard-charts').catch(() => null)
       ]);
 
       if (alertasRes?.ok) {
@@ -374,7 +374,7 @@ export class Admin implements OnInit, AfterViewInit {
     try {
       this.loading = true;
       const response = await fetch(
-        `http://localhost:3000/api/admin/usuarios?page=${this.usuariosPage}&search=${this.searchTerm}`
+        `http://18.223.160.105:3000/api/admin/usuarios?page=${this.usuariosPage}&search=${this.searchTerm}`
       );
       const data = await response.json();
 
@@ -415,8 +415,8 @@ export class Admin implements OnInit, AfterViewInit {
       }
 
       const url = this.editingUsuario
-        ? `http://localhost:3000/api/admin/usuarios/${this.editingUsuario._id}`
-        : 'http://localhost:3000/api/admin/usuarios';
+        ? `http://18.223.160.105:3000/api/admin/usuarios/${this.editingUsuario._id}`
+        : 'http://18.223.160.105:3000/api/admin/usuarios';
 
       const method = this.editingUsuario ? 'PUT' : 'POST';
 
@@ -440,7 +440,7 @@ export class Admin implements OnInit, AfterViewInit {
     if (!confirm('¿Estás seguro de eliminar este usuario? También se eliminarán todas sus mascotas.')) return;
 
     try {
-      await fetch(`http://localhost:3000/api/admin/usuarios/${id}`, { method: 'DELETE' });
+      await fetch(`http://18.223.160.105:3000/api/admin/usuarios/${id}`, { method: 'DELETE' });
       this.loadUsuarios();
       this.loadDashboard();
     } catch (error) {
@@ -459,7 +459,7 @@ export class Admin implements OnInit, AfterViewInit {
     try {
       this.loading = true;
       const response = await fetch(
-        `http://localhost:3000/api/admin/mascotas?page=${this.mascotasPage}&search=${this.searchTerm}`
+        `http://18.223.160.105:3000/api/admin/mascotas?page=${this.mascotasPage}&search=${this.searchTerm}`
       );
       const data = await response.json();
 
@@ -493,8 +493,8 @@ export class Admin implements OnInit, AfterViewInit {
     try {
       this.loading = true;
       const url = this.editingMascota
-        ? `http://localhost:3000/api/admin/mascotas/${this.editingMascota._id}`
-        : 'http://localhost:3000/api/mascotas';
+        ? `http://18.223.160.105:3000/api/admin/mascotas/${this.editingMascota._id}`
+        : 'http://18.223.160.105:3000/api/mascotas';
 
       const method = this.editingMascota ? 'PUT' : 'POST';
 
@@ -518,7 +518,7 @@ export class Admin implements OnInit, AfterViewInit {
     if (!confirm('¿Estás seguro de eliminar esta mascota?')) return;
 
     try {
-      await fetch(`http://localhost:3000/api/admin/mascotas/${id}`, { method: 'DELETE' });
+      await fetch(`http://18.223.160.105:3000/api/admin/mascotas/${id}`, { method: 'DELETE' });
       this.loadMascotas();
       this.loadDashboard();
     } catch (error) {
@@ -617,7 +617,7 @@ export class Admin implements OnInit, AfterViewInit {
       // Usar setTimeout para evitar bloqueo de UI y errores de Angular
       setTimeout(async () => {
         try {
-          const response = await fetch('http://localhost:3000/api/admin/dashboard-charts');
+          const response = await fetch('http://18.223.160.105:3000/api/admin/dashboard-charts');
           if (!response.ok) {
             throw new Error('Error en la respuesta del servidor');
           }
@@ -834,7 +834,7 @@ export class Admin implements OnInit, AfterViewInit {
       setTimeout(async () => {
         try {
           // Límite aún más pequeño para carga inicial súper rápida
-          let url = 'http://localhost:3000/api/admin/datos-iot?limit=10';
+          let url = 'http://18.223.160.105:3000/api/admin/datos-iot?limit=10';
           
           if (this.reportFilters.fechaInicio) {
             url += `&fechaInicio=${this.reportFilters.fechaInicio}`;
@@ -874,7 +874,7 @@ export class Admin implements OnInit, AfterViewInit {
       console.log('⚡ Generando reporte Excel optimizado...');
       this.loading = true;
       
-      let url = 'http://localhost:3000/api/admin/reportes/excel?';
+      let url = 'http://18.223.160.105:3000/api/admin/reportes/excel?';
       
       if (this.reportFilters.fechaInicio) {
         url += `fechaInicio=${this.reportFilters.fechaInicio}&`;
@@ -934,7 +934,7 @@ export class Admin implements OnInit, AfterViewInit {
     try {
       this.loading = true;
       
-      const response = await fetch('http://localhost:3000/api/admin/datos-iot/generar-ejemplo', {
+      const response = await fetch('http://18.223.160.105:3000/api/admin/datos-iot/generar-ejemplo', {
         method: 'POST'
       });
       

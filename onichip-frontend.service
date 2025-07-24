@@ -12,7 +12,7 @@ Group=ubuntu
 WorkingDirectory=/opt/onichip/frontend
 Environment=NODE_ENV=production
 Environment=PORT=80
-Environment=BACKEND_URL=http://localhost:3000
+Environment=BACKEND_URL=http://18.223.160.105:3000
 ExecStart=/usr/bin/node server-production.js
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=always

@@ -66,7 +66,7 @@ export class Registromascota {
     }
     console.log('📝 Registrando mascota:', mascota);
 
-    this.http.post<any>('http://localhost:3000/api/device', mascota).subscribe({
+    this.http.post<any>('http://18.223.160.105:3000/api/device', mascota).subscribe({
       next: () => {
         this.successMsg = '¡Mascota registrada exitosamente!';
         this.loading = false;
