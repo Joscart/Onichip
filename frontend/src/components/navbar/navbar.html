@@ -1,0 +1,42 @@
+<!-- 🧭 NAVBAR GPS COMPONENTE -->
+<nav class="navbar">
+  <div class="navbar-brand">
+    <span class="brand-icon">🐾</span>
+    {{ title }}
+  </div>
+  
+  <div class="navbar-actions">
+    <!-- Botón de retroceso (condicional) -->
+    <button 
+      *ngIf="showBackButton" 
+      class="btn-back"
+      (click)="onNavigateBack()"
+      title="Volver">
+      ← Volver
+    </button>
+
+    <!-- Acciones de usuario (condicional) -->
+    <ng-container *ngIf="showUserActions">
+      <!-- Saludo al usuario -->
+      <span *ngIf="userName" class="user-greeting">
+        👋 ¡Hola, {{ userName }}!
+      </span>
+      
+      <!-- Botón registrar mascota -->
+      <button 
+        class="btn-register"
+        (click)="onNavigateToRegister()"
+        title="Registrar nueva mascota">
+        🐕 Registrar Mascota
+      </button>
+      
+      <!-- Botón cerrar sesión -->
+      <button 
+        class="btn-logout"
+        (click)="onLogout()"
+        title="Cerrar sesión">
+        🚪 Cerrar Sesión
+      </button>
+    </ng-container>
+  </div>
+</nav>

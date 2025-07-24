@@ -1,0 +1,147 @@
+/* 🧭 NAVBAR GPS - COMPONENTE REUTILIZABLE */
+
+.navbar {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  padding: 16px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  border-radius: 0 0 16px 16px;
+  margin-bottom: 24px;
+}
+
+.navbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #2563eb;
+}
+
+.brand-icon {
+  font-size: 1.8rem;
+  animation: bounce 2s infinite;
+}
+
+.navbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.user-greeting {
+  color: #4f46e5;
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-right: 8px;
+}
+
+/* Botones base */
+.navbar-actions button {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+/* Botón de retroceso */
+.btn-back {
+  background: #e3f2fd !important;
+  color: #1976d2 !important;
+}
+
+.btn-back:hover {
+  background: #bbdefb !important;
+  transform: translateY(-1px);
+}
+
+/* Botón registrar mascota */
+.btn-register {
+  background: #4caf50 !important;
+  color: white !important;
+}
+
+.btn-register:hover {
+  background: #45a049 !important;
+  transform: translateY(-1px);
+}
+
+/* Botón cerrar sesión */
+.btn-logout {
+  background: #f44336 !important;
+  color: white !important;
+}
+
+.btn-logout:hover {
+  background: #da190b !important;
+  transform: translateY(-1px);
+}
+
+/* Animación del icono */
+@keyframes bounce {
+  0%, 20%, 50%, 80%, 100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-5px);
+  }
+  60% {
+    transform: translateY(-3px);
+  }
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .navbar {
+    padding: 12px 16px;
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
+  }
+  
+  .navbar-brand {
+    justify-content: center;
+    font-size: 1.3rem;
+  }
+  
+  .navbar-actions {
+    justify-content: center;
+    gap: 8px;
+  }
+  
+  .navbar-actions button {
+    padding: 8px 12px;
+    font-size: 12px;
+    flex: 1;
+    min-width: 0;
+  }
+  
+  .user-greeting {
+    font-size: 0.8rem;
+    text-align: center;
+    width: 100%;
+    order: -1;
+  }
+}
+
+@media (max-width: 480px) {
+  .navbar-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .navbar-actions button {
+    width: 100%;
+  }
+}

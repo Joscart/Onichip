@@ -21,69 +21,42 @@ body {
   -webkit-background-clip: initial !important;
 }
 
-/* 🧭 NAVBAR GPS */
-.navbar {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
-  padding: 16px 24px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  position: sticky;
-  top: 0;
-  z-index: 1000;
+/* 🔄 CONTROLES FLOTANTES */
+.floating-controls {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 999;
 }
 
-.navbar-brand {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: #2563eb;
-}
-
-.navbar-actions {
-  display: flex;
-  gap: 12px;
-}
-
-.navbar-actions button {
-  padding: 10px 16px;
+.refresh-btn {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  color: white;
   border: none;
-  border-radius: 8px;
+  padding: 12px 20px;
+  border-radius: 50px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 16px rgba(79, 70, 229, 0.3);
   font-size: 14px;
 }
 
-.navbar-actions button:first-child {
-  background: #e3f2fd;
-  color: #1976d2;
+.refresh-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(79, 70, 229, 0.4);
 }
 
-.navbar-actions button:first-child:hover {
-  background: #bbdefb;
-  transform: translateY(-1px);
+.refresh-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  animation: pulse 1.5s infinite;
 }
 
-.navbar-actions button:nth-child(2) {
-  background: #4caf50;
-  color: white;
-}
-
-.navbar-actions button:nth-child(2):hover {
-  background: #45a049;
-  transform: translateY(-1px);
-}
-
-.navbar-actions button:last-child {
-  background: #f44336;
-  color: white;
-}
-
-.navbar-actions button:last-child:hover {
-  background: #da190b;
-  transform: translateY(-1px);
+@keyframes pulse {
+  0% { opacity: 0.7; }
+  50% { opacity: 0.4; }
+  100% { opacity: 0.7; }
 }
 
 /* 📊 DASHBOARD CONTAINER */
@@ -271,37 +244,6 @@ body {
 .no-mascotas button:hover {
   background: #5b21b6;
 }
-.navbar {
-  background: #7c3aed;
-  color: #fff;
-  padding: 18px 32px;
-  border-radius: 0 0 24px 24px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 32px;
-}
-.navbar-brand {
-  font-size: 2rem;
-  font-weight: 800;
-  letter-spacing: 1px;
-}
-.navbar-actions button {
-  background: #fff;
-  color: #7c3aed;
-  border: none;
-  border-radius: 8px;
-  padding: 8px 20px;
-  font-size: 1rem;
-  font-weight: 600;
-  margin-left: 12px;
-  cursor: pointer;
-  transition: background 0.2s, color 0.2s;
-}
-.navbar-actions button:hover {
-  background: #ede9fe;
-  color: #5b21b6;
-}
 
 .dashboard-container {
   max-width: 900px;
@@ -310,26 +252,6 @@ body {
   background: #f6f7fb;
   border-radius: 24px;
   box-shadow: 0 4px 32px rgba(94,33,187,0.08);
-}
-
-.navbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: #5e21bb;
-  color: #fff;
-  padding: 18px 32px;
-  border-radius: 0 0 18px 18px;
-  margin-bottom: 32px;
-  box-shadow: 0 2px 12px rgba(94,33,187,0.10);
-}
-.navbar-brand {
-  font-size: 2rem;
-  font-weight: 900;
-  letter-spacing: 2px;
-}
-.navbar-actions button {
-  margin-left: 16px;
 }
 
 .mascotas-list {

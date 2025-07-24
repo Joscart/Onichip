@@ -1,18 +1,18 @@
 
-
 import { Component, OnInit, OnDestroy, ChangeDetectorRef, ViewChild, ElementRef, AfterViewInit } from '@angular/core';
 import { MascotasService } from './mascotas.service';
 import { Router } from '@angular/router';
 import { CommonModule, DatePipe } from '@angular/common';
 import { Subject, takeUntil, timeout, catchError, of } from 'rxjs';
 import * as L from 'leaflet';
+import { NavbarComponent } from '../navbar/navbar';
 
 @Component({
   selector: 'app-homeusuario',
   templateUrl: './homeusuario.html',
   styleUrl: './homeusuario.css',
   standalone: true,
-  imports: [CommonModule, DatePipe]
+  imports: [CommonModule, DatePipe, NavbarComponent]
 })
 export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
   mascotas: any[] = [];
@@ -613,15 +613,6 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
     return 'assets/toby.png';
   }
 
-  logout() {
-    localStorage.removeItem('usuario');
-    this.router.navigate(['/']);
-  }
-
-  registrarMascota() {
-    this.router.navigate(['/registromascota']);
-  }
-
   // Asociar o editar el deviceId de una mascota
   asociarDispositivo(mascota: any) {
     const nuevoDeviceId = prompt('Ingrese el nuevo ID del dispositivo GPS:', mascota.dispositivo?.id || '');
@@ -653,5 +644,19 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
   // Método legacy mantenido para compatibilidad
   fetchMascotas() {
     this.fetchMascotasOptimized();
+  }
+
+  // ===== MÉTODOS PARA NAVBAR =====
+  
+  // Manejar logout desde navbar
+  onLogout() {
+    localStorage.removeItem('user');
+    localStorage.removeItem('token');
+    this.router.navigate(['/acceso']);
+  }
+
+  // Navegar a registro de mascota
+  onNavigateToRegister() {
+    this.router.navigate(['/registromascota']);
   }
 }

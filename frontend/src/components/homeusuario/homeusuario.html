@@ -1,14 +1,23 @@
 
-<nav class="navbar">
-  <div class="navbar-brand">🗺️ Onichip GPS</div>
-  <div class="navbar-actions">
-    <button (click)="refreshData()" [disabled]="loading" title="Actualizar ubicaciones">
-      🔄 {{ loading ? 'Cargando...' : 'Actualizar' }}
-    </button>
-    <button (click)="registrarMascota()">➕ Registrar Mascota</button>
-    <button (click)="logout()">🚪 Cerrar Sesión</button>
-  </div>
-</nav>
+<!-- Navbar Component -->
+<app-navbar 
+  [userName]="user?.nombre || user?.name"
+  [title]="'🗺️ Onichip GPS'"
+  [showUserActions]="true"
+  (logout)="onLogout()"
+  (navigateToRegister)="onNavigateToRegister()">
+</app-navbar>
+
+<!-- Botón de actualización flotante -->
+<div class="floating-controls">
+  <button 
+    class="refresh-btn" 
+    (click)="refreshData()" 
+    [disabled]="loading" 
+    title="Actualizar ubicaciones">
+    🔄 {{ loading ? 'Cargando...' : 'Actualizar' }}
+  </button>
+</div>
 
 <div class="dashboard-container">
   <!-- Mensaje de bienvenida -->
@@ -40,7 +49,7 @@
       <div class="empty-icon">�️</div>
       <h3>No tienes mascotas registradas aún</h3>
       <p>Registra tu primera mascota para comenzar a rastrear su ubicación GPS</p>
-      <button (click)="registrarMascota()" class="primary-btn">📍 Registrar Primera Mascota</button>
+      <button (click)="onNavigateToRegister()" class="primary-btn">📍 Registrar Primera Mascota</button>
     </div>
   </div>
 
