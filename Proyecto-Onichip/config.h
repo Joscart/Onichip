@@ -5,7 +5,7 @@
 
 // Unique identifier for this tracker device
 #define DEVICE_ID    "collar-test"
-#define API_BASE     "http://192.168.230.130:3000"
+#define API_BASE     "http://18.223.160.105:3000"
 
 
 // ————— SIM & GPRS —————
