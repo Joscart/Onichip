@@ -1,21 +1,148 @@
 <!doctype html>
-<html lang="en">
+<html lang="es">
 <head>
   <meta charset="utf-8">
-  <title>Onichip</title>
+  <title>🐾 OnichipGPS - Rastreador Profesional de Mascotas</title>
   <base href="/">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="icon" type="image/x-icon" href="favicon.ico">
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css">
+  <meta name="description" content="Rastreador GPS profesional para mascotas en tiempo real con tecnología avanzada">
+  <link rel="icon" type="image/x-icon" href="onichip2.ico">
+  
+  <!-- Google Fonts mejoradas -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Poppins:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <!-- Material Icons para iconos profesionales -->
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  
+  <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  
+  <!-- Estilos principales -->
+  <link rel="stylesheet" href="styles.css">
+  
+  <!-- Scripts -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
   <style>
     :root {
-      --gray-700: #4a5568;
-      --bright-blue: #3b82f6;
-      --red-to-pink-to-purple-vertical-gradient: linear-gradient(to bottom, #f87171, #ec4899, #8b5cf6);
+      /* Colores principales profesionales */
+      --primary-color: #2563eb;
+      --primary-dark: #1d4ed8;
+      --secondary-color: #7c3aed;
+      --accent-color: #059669;
+      --warning-color: #f59e0b;
+      --danger-color: #dc2626;
+      --success-color: #10b981;
+      
+      /* Grises profesionales */
+      --gray-50: #f9fafb;
+      --gray-100: #f3f4f6;
+      --gray-200: #e5e7eb;
+      --gray-300: #d1d5db;
+      --gray-400: #9ca3af;
+      --gray-500: #6b7280;
+      --gray-600: #4b5563;
+      --gray-700: #374151;
+      --gray-800: #1f2937;
+      --gray-900: #111827;
+      
+      /* Gradientes profesionales */
+      --gradient-primary: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+      --gradient-success: linear-gradient(135deg, #059669 0%, #10b981 100%);
+      --gradient-header: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+      
+      /* Sombras profesionales */
+      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+      --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+      
+      /* Tipografía */
+      --font-primary: 'Inter', 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-emoji: "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji", "Twemoji Mozilla";
+    }
+    
+    /* Reset y mejoras globales */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    html {
+      font-size: 16px;
+      scroll-behavior: smooth;
+    }
+    
+    body {
+      font-family: var(--font-primary);
+      font-weight: 400;
+      line-height: 1.6;
+      color: var(--gray-700);
+      background: var(--gradient-primary);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+    }
+    
+    /* Mejorar renderización de emojis y iconos */
+    .emoji, 
+    [class*="emoji"],
+    .material-icons,
+    *::before,
+    *::after {
+      font-family: var(--font-emoji), var(--font-primary) !important;
+      font-variant-emoji: emoji !important;
+      text-rendering: optimizeLegibility !important;
+      -webkit-font-feature-settings: "liga" on, "kern" on !important;
+      font-feature-settings: "liga" on, "kern" on !important;
+      vertical-align: middle;
+      display: inline-block;
+    }
+    
+    /* Animaciones suaves */
+    .smooth-transition {
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    /* Loading spinner profesional */
+    .loading-spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid var(--gray-200);
+      border-top: 3px solid var(--primary-color);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    /* Estilo para pines de mapa coloridos */
+    .custom-pin {
+      background: var(--gradient-primary);
+      width: 30px;
+      height: 30px;
+      border-radius: 50% 50% 50% 0;
+      border: 3px solid white;
+      box-shadow: var(--shadow-lg);
+      transform: rotate(-45deg);
+      position: relative;
+    }
+    
+    .custom-pin::after {
+      content: '🐾';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(45deg);
+      font-size: 12px;
     }
   </style>
 </head>

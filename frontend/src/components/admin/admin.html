@@ -67,6 +67,12 @@
       class="nav-btn">
       <span class="emoji">🐕</span> Mascotas
     </button>
+    <button 
+      [class.active]="activeTab === 'reportes'" 
+      (click)="setActiveTab('reportes')"
+      class="nav-btn">
+      <span class="emoji">📋</span> Reportes
+    </button>
   </nav>
 
   <!-- Contenido principal -->
@@ -376,5 +382,187 @@
         </button>
       </div>
     </form>
+  </div>
+</div>
+
+<!-- 📋 SECCIÓN DE REPORTES -->
+<div *ngIf="activeTab === 'reportes'" id="reportes" class="reportes-tab">
+  <div class="reportes-container">
+    <div class="reportes-header">
+      <h2><span class="emoji">📋</span> Sistema de Reportes IoT</h2>
+      <p>Genere reportes detallados y visualice estadísticas en tiempo real</p>
+    </div>
+
+    <!-- Dashboard con Gráficos -->
+    <div class="dashboard-section">
+      <h3><span class="emoji">📊</span> Dashboard Estadístico</h3>
+      <div class="charts-grid">
+        <!-- Gráfico de Pastel -->
+        <div class="chart-container">
+          <h4>Distribución de Mascotas por Tipo</h4>
+          <canvas #pieChart class="chart-canvas"></canvas>
+        </div>
+
+        <!-- Gráfico de Barras -->
+        <div class="chart-container">
+          <h4>Actividad Mensual de Dispositivos</h4>
+          <canvas #barChart class="chart-canvas"></canvas>
+        </div>
+
+        <!-- Gráfico de Líneas -->
+        <div class="chart-container">
+          <h4>Dispositivos Activos por Horario</h4>
+          <canvas #lineChart class="chart-canvas"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Generador de Reportes -->
+    <div class="report-generator">
+      <h3>🔧 Generador de Reportes</h3>
+      <form (ngSubmit)="generateReport()">
+        <div class="filters-grid">
+          <div class="form-group">
+            <label>Tipo de Reporte</label>
+            <select [(ngModel)]="reporteFilters.tipoReporte" name="tipoReporte">
+              <option value="dispositivos">Dispositivos IoT</option>
+              <option value="ubicaciones">Historial de Ubicaciones</option>
+              <option value="alertas">Alertas del Sistema</option>
+              <option value="estadisticas">Estadísticas Generales</option>
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label>Fecha Inicio</label>
+            <input type="date" [(ngModel)]="reporteFilters.fechaInicio" name="fechaInicio">
+          </div>
+          
+          <div class="form-group">
+            <label>Fecha Fin</label>
+            <input type="date" [(ngModel)]="reporteFilters.fechaFin" name="fechaFin">
+          </div>
+          
+          <div class="form-group">
+            <label>Mascota (Opcional)</label>
+            <select [(ngModel)]="reporteFilters.mascotaId" name="mascotaId">
+              <option value="">Todas las mascotas</option>
+              <option *ngFor="let mascota of mascotas" [value]="mascota._id">
+                {{ mascota.nombre }} ({{ mascota.especie }})
+              </option>
+            </select>
+          </div>
+        </div>
+        
+        <div class="filter-actions">
+          <button type="submit" class="primary-btn" [disabled]="loading">
+            <span *ngIf="!loading">📊</span>
+            {{ loading ? 'Generando...' : 'Generar Vista Previa' }}
+          </button>
+          
+          <button type="button" 
+                  (click)="exportToExcel()" 
+                  class="secondary-btn" 
+                  [disabled]="loading">
+            📄 Exportar a Excel
+          </button>
+          
+          <button type="button" 
+                  (click)="exportToPDF()" 
+                  class="secondary-btn" 
+                  [disabled]="loading">
+            📋 Exportar a PDF
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Vista Previa de Datos -->
+    <div *ngIf="reporteData && reporteData.length > 0" class="data-preview">
+      <h4>Vista Previa del Reporte: {{ reporteFilters.tipoReporte }}</h4>
+      <p><strong>Período:</strong> {{ reporteFilters.fechaInicio }} al {{ reporteFilters.fechaFin }}</p>
+      <p><strong>Total de registros:</strong> {{ reporteData.total }}</p>
+      
+      <!-- Tabla de datos -->
+      <div class="table-content">
+        <table class="preview-table">
+          <thead>
+            <tr *ngIf="reporteFilters.tipoReporte === 'dispositivos'">
+              <th>ID</th>
+              <th>Serial</th>
+              <th>Modelo</th>
+              <th>Estado</th>
+              <th>Batería</th>
+              <th>Última Conexión</th>
+              <th>Mascota</th>
+              <th>Usuario</th>
+            </tr>
+            <tr *ngIf="reporteFilters.tipoReporte === 'ubicaciones'">
+              <th>Fecha/Hora</th>
+              <th>Mascota</th>
+              <th>Latitud</th>
+              <th>Longitud</th>
+              <th>Precisión</th>
+              <th>Velocidad</th>
+              <th>Método</th>
+              <th>Batería</th>
+            </tr>
+            <tr *ngIf="reporteFilters.tipoReporte === 'alertas'">
+              <th>Fecha/Hora</th>
+              <th>Tipo</th>
+              <th>Prioridad</th>
+              <th>Mensaje</th>
+              <th>Dispositivo</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Dispositivos -->
+            <ng-container *ngIf="reporteFilters.tipoReporte === 'dispositivos'">
+              <tr *ngFor="let item of reporteData | slice:0:10">
+                <td>{{ item.id }}</td>
+                <td>{{ item.serial }}</td>
+                <td>{{ item.modelo }}</td>
+                <td>{{ item.estado }}</td>
+                <td>{{ item.bateria }}</td>
+                <td>{{ item.ultimaConexion | date:'short' }}</td>
+                <td>{{ item.mascota }}</td>
+                <td>{{ item.usuario }}</td>
+              </tr>
+            </ng-container>
+            
+            <!-- Ubicaciones -->
+            <tr *ngFor="let item of reporteData.ubicaciones?.slice(0, 10)" 
+                [hidden]="reporteFilters.tipoReporte !== 'ubicaciones'">
+              <td>{{ item.timestamp | date:'short' }}</td>
+              <td>{{ item.mascota }}</td>
+              <td>{{ item.latitude }}</td>
+              <td>{{ item.longitude }}</td>
+              <td>{{ item.accuracy }}m</td>
+              <td>{{ item.speed }}km/h</td>
+              <td>{{ item.method }}</td>
+              <td>{{ item.battery }}</td>
+            </tr>
+            
+            <!-- Alertas -->
+            <tr *ngFor="let item of reporteData.alertas?.slice(0, 10)" 
+                [hidden]="reporteFilters.tipoReporte !== 'alertas'">
+              <td>{{ item.timestamp | date:'short' }}</td>
+              <td>{{ item.tipo }}</td>
+              <td>{{ item.prioridad }}</td>
+              <td>{{ item.mensaje }}</td>
+              <td>{{ item.dispositivo }}</td>
+              <td>{{ item.estado }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      
+      <div *ngIf="reporteData.total > 10" class="text-center mt-4">
+        <small class="text-sm text-gray-600">
+          Mostrando 10 de {{ reporteData.total }} registros. 
+          Use la exportación para ver todos los datos.
+        </small>
+      </div>
+    </div>
   </div>
 </div>

@@ -28,7 +28,29 @@ router.delete('/mascotas/:id', adminController.deleteMascota);
 router.get('/datos-iot', adminController.getDatosIoT);
 router.post('/datos-iot/generar-ejemplo', adminController.generateSampleIoTData);
 
+// 📊 Reportes Excel - OPTIMIZADO
+router.get('/reportes/excel', adminController.generateExcelReport);
+router.get('/generate-excel', adminController.generateExcelReport); // Alias para compatibilidad
+
+// 📋 NUEVAS RUTAS PARA REPORTES AVANZADOS
+router.get('/dashboard-stats', adminController.dashboardStats);
+router.post('/generate-report', adminController.generateReport);
+router.post('/export-pdf', adminController.exportPDF);
+
 // 📄 Reportes - OPTIMIZADO
 router.get('/reportes/excel', adminController.generateExcelReport);
+
+// ================================================
+// 📊 NUEVAS RUTAS - REPORTES Y DASHBOARD AVANZADO
+// ================================================
+
+// 📈 Dashboard avanzado con estadísticas para gráficos
+router.get('/dashboard-stats', adminController.dashboardStats);
+
+// 📋 Generación de reportes exportables
+router.post('/generate-report', adminController.generateReport);
+
+// 📄 Exportación de reportes
+router.post('/export-pdf', adminController.exportPDF);
 
 module.exports = router;
