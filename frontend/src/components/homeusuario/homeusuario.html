@@ -183,17 +183,69 @@
 
   <!-- Modal del mapa -->
   <div class="modal-overlay" *ngIf="showMapModal" (click)="closeMapModal()">
-    <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-content map-modal" (click)="$event.stopPropagation()">
       <div class="modal-header">
         <h3>🗺️ Ubicación de {{ selectedMascota?.nombre }}</h3>
-        <button class="close-btn" (click)="closeMapModal()">✕</button>
+        <div class="map-controls">
+          <button class="control-btn" (click)="centerMap()" title="Centrar en mascota">
+            🎯 Centrar
+          </button>
+          <button class="control-btn" (click)="refreshLocation()" title="Actualizar ubicación">
+            🔄 Actualizar
+          </button>
+          <button class="control-btn" [class.active]="mapUpdateInterval" 
+                  (click)="toggleAutoUpdate()" title="Auto-actualización cada 10s">
+            {{ mapUpdateInterval ? '⏸️ Pausar' : '▶️ Auto' }}
+          </button>
+          <button class="close-btn" (click)="closeMapModal()">✕</button>
+        </div>
       </div>
       <div class="modal-body">
-        <div class="map-placeholder">
-          <h4>📍 Mapa GPS</h4>
-          <p>Funcionalidad de mapa próximamente disponible</p>
-          <p><strong>Mascota:</strong> {{ selectedMascota?.nombre }}</p>
-          <p><strong>ID:</strong> {{ selectedMascota?._id }}</p>
+        <div class="map-info" *ngIf="selectedMascota?.ubicacionActual">
+          <div class="location-details">
+            <span class="info-item">
+              📍 {{ selectedMascota.ubicacionActual.latitude?.toFixed(6) }}, 
+              {{ selectedMascota.ubicacionActual.longitude?.toFixed(6) }}
+            </span>
+            <span class="info-item">
+              🎯 Precisión: {{ selectedMascota.ubicacionActual.accuracy }}m
+            </span>
+            <span class="info-item">
+              🏃 Velocidad: {{ selectedMascota.ubicacionActual.speed || 0 }} km/h
+            </span>
+            <span class="info-item">
+              � Método: {{ selectedMascota.ubicacionActual.method || 'GPS' }}
+            </span>
+            <span class="info-item">
+              ⏰ {{ getLastLocationUpdate(selectedMascota) }}
+            </span>
+          </div>
+        </div>
+        
+        <!-- Contenedor del mapa -->
+        <div class="map-container">
+          <div id="pet-map" class="leaflet-map" #mapContainer></div>
+          
+          <!-- Overlay de carga del mapa -->
+          <div class="map-loading" *ngIf="mapLoading">
+            <div class="loading-spinner"></div>
+            <p>Cargando mapa...</p>
+          </div>
+          
+          <!-- Mensaje de error del mapa -->
+          <div class="map-error" *ngIf="mapError">
+            <span class="emoji">❌</span>
+            <p>Error al cargar el mapa</p>
+            <button (click)="initializeMap()" class="retry-btn">🔄 Reintentar</button>
+          </div>
+          
+          <!-- Sin ubicación -->
+          <div class="no-location-map" *ngIf="!selectedMascota?.ubicacionActual && !mapLoading">
+            <span class="emoji">📍</span>
+            <h4>Sin ubicación GPS</h4>
+            <p>La mascota no tiene datos de ubicación disponibles</p>
+            <p>Verifique que el dispositivo GPS esté conectado y funcionando</p>
+          </div>
         </div>
       </div>
     </div>

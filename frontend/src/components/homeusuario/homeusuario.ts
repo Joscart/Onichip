@@ -1,10 +1,11 @@
 
 
-import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef, ViewChild, ElementRef, AfterViewInit } from '@angular/core';
 import { MascotasService } from './mascotas.service';
 import { Router } from '@angular/router';
 import { CommonModule, DatePipe } from '@angular/common';
 import { Subject, takeUntil, timeout, catchError, of } from 'rxjs';
+import * as L from 'leaflet';
 
 @Component({
   selector: 'app-homeusuario',
@@ -13,7 +14,7 @@ import { Subject, takeUntil, timeout, catchError, of } from 'rxjs';
   standalone: true,
   imports: [CommonModule, DatePipe]
 })
-export class Homeusuario implements OnInit, OnDestroy {
+export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
   mascotas: any[] = [];
   loading = true;
   user: any = null;
@@ -23,6 +24,15 @@ export class Homeusuario implements OnInit, OnDestroy {
   // Estados del mapa
   showMapModal = false;
   selectedMascota: any = null;
+  mapLoading = false;
+  mapError = false;
+  mapUpdateInterval: any = null; // Cambiado a público
+  
+  // Referencias del mapa
+  @ViewChild('mapContainer', { static: false }) mapContainer!: ElementRef;
+  private map: L.Map | null = null;
+  private petMarker: L.Marker | null = null;
+  private accuracyCircle: L.Circle | null = null;
   
   private destroy$ = new Subject<void>();
   private maxRetries = 3;
@@ -49,16 +59,33 @@ export class Homeusuario implements OnInit, OnDestroy {
     this.setupAutoRefresh();
   }
 
+  ngAfterViewInit() {
+    // Se ejecutará después de que la vista esté completamente inicializada
+  }
+
   ngOnDestroy() {
     this.destroy$.next();
     this.destroy$.complete();
+    
+    // Limpiar intervals
+    if (this.mapUpdateInterval) {
+      clearInterval(this.mapUpdateInterval);
+    }
+    
+    // Limpiar el mapa si existe
+    if (this.map) {
+      this.map.remove();
+    }
   }
 
   // 🔄 CONFIGURAR ACTUALIZACIÓN AUTOMÁTICA
   setupAutoRefresh() {
     setInterval(() => {
-      if (!this.showMapModal) { // Solo actualizar si no hay modal abierto
-        this.refreshLocationData();
+      this.refreshLocationData();
+      
+      // Si el modal del mapa está abierto, actualizar el mapa también
+      if (this.showMapModal && this.selectedMascota) {
+        this.updateMapLocation();
       }
     }, 30000); // 30 segundos
   }
@@ -68,6 +95,9 @@ export class Homeusuario implements OnInit, OnDestroy {
     // Por ahora simular datos GPS hasta que el servicio esté funcionando
     this.mascotas.forEach(mascota => {
       if (mascota._id) {
+        // Guardar ubicación anterior para detectar cambios
+        const oldLocation = mascota.ubicacionActual ? { ...mascota.ubicacionActual } : null;
+        
         // Simular datos GPS aleatorios para demo
         mascota.ubicacionActual = {
           latitude: 19.4326 + (Math.random() - 0.5) * 0.01,
@@ -77,6 +107,27 @@ export class Homeusuario implements OnInit, OnDestroy {
           method: Math.random() > 0.7 ? 'WiFi' : 'GPS',
           timestamp: new Date().toISOString()
         };
+        
+        // Si el mapa está abierto y es la mascota seleccionada, actualizar el mapa
+        if (this.showMapModal && this.selectedMascota && 
+            this.selectedMascota._id === mascota._id) {
+          
+          // Verificar si la ubicación cambió significativamente
+          if (oldLocation) {
+            const latDiff = Math.abs(mascota.ubicacionActual.latitude - oldLocation.latitude);
+            const lngDiff = Math.abs(mascota.ubicacionActual.longitude - oldLocation.longitude);
+            
+            if (latDiff > 0.000001 || lngDiff > 0.000001) { // Cambio mínimo detectable
+              console.log('📍 Nueva ubicación detectada, actualizando mapa...');
+              this.selectedMascota.ubicacionActual = mascota.ubicacionActual;
+              setTimeout(() => this.updateMapLocation(), 100);
+            }
+          } else {
+            // Primera vez que se obtiene ubicación
+            this.selectedMascota.ubicacionActual = mascota.ubicacionActual;
+            setTimeout(() => this.updateMapLocation(), 100);
+          }
+        }
         
         if (!mascota.dispositivo) {
           mascota.dispositivo = {};
@@ -89,6 +140,8 @@ export class Homeusuario implements OnInit, OnDestroy {
         this.cdr.detectChanges();
       }
     });
+    
+    console.log('🔄 Datos de ubicación actualizados para', this.mascotas.length, 'mascotas');
   }
 
   // 📊 CARGAR DATOS DE MASCOTAS
@@ -201,11 +254,342 @@ export class Homeusuario implements OnInit, OnDestroy {
   verMapa(mascota: any) {
     this.selectedMascota = mascota;
     this.showMapModal = true;
+    this.mapError = false;
+    
+    // Configurar actualización más frecuente para el mapa (cada 10 segundos)
+    this.setupMapAutoUpdate();
+    
+    // Inicializar el mapa después de que el modal se abra
+    setTimeout(() => {
+      this.initializeMap();
+    }, 100);
   }
 
   closeMapModal() {
     this.showMapModal = false;
     this.selectedMascota = null;
+    
+    // Limpiar actualización frecuente del mapa
+    if (this.mapUpdateInterval) {
+      clearInterval(this.mapUpdateInterval);
+      this.mapUpdateInterval = null;
+    }
+    
+    // Limpiar el mapa
+    if (this.map) {
+      this.map.remove();
+      this.map = null;
+      this.petMarker = null;
+      this.accuracyCircle = null;
+    }
+  }
+
+  // 🔄 ALTERNAR AUTO-ACTUALIZACIÓN DEL MAPA
+  toggleAutoUpdate() {
+    if (this.mapUpdateInterval) {
+      // Pausar auto-actualización
+      clearInterval(this.mapUpdateInterval);
+      this.mapUpdateInterval = null;
+      console.log('⏸️ Auto-actualización pausada');
+    } else {
+      // Activar auto-actualización
+      this.setupMapAutoUpdate();
+      console.log('▶️ Auto-actualización activada (cada 10s)');
+    }
+  }
+
+  // 🔄 CONFIGURAR ACTUALIZACIÓN AUTOMÁTICA DEL MAPA
+  setupMapAutoUpdate() {
+    // Limpiar interval anterior si existe
+    if (this.mapUpdateInterval) {
+      clearInterval(this.mapUpdateInterval);
+    }
+    
+    // Actualizar cada 10 segundos cuando el mapa esté abierto
+    this.mapUpdateInterval = setInterval(() => {
+      if (this.showMapModal && this.selectedMascota) {
+        console.log('🔄 Actualizando ubicación del mapa automáticamente...');
+        this.refreshSingleMascotaLocation(this.selectedMascota);
+      }
+    }, 10000); // 10 segundos
+  }
+
+  // 🔄 ACTUALIZAR UBICACIÓN DE UNA MASCOTA ESPECÍFICA
+  refreshSingleMascotaLocation(mascota: any) {
+    if (!mascota) return;
+    
+    // Guardar ubicación anterior
+    const oldLocation = mascota.ubicacionActual ? { ...mascota.ubicacionActual } : null;
+    
+    // Simular nueva ubicación GPS (reemplazar con llamada real al API)
+    const newLocation = {
+      latitude: 19.4326 + (Math.random() - 0.5) * 0.01,
+      longitude: -99.1332 + (Math.random() - 0.5) * 0.01,
+      accuracy: Math.floor(Math.random() * 10) + 5,
+      speed: Math.floor(Math.random() * 20),
+      method: Math.random() > 0.7 ? 'WiFi' : 'GPS',
+      timestamp: new Date().toISOString()
+    };
+    
+    // Actualizar la ubicación
+    mascota.ubicacionActual = newLocation;
+    
+    // Si hay cambio significativo, actualizar el mapa
+    if (oldLocation) {
+      const latDiff = Math.abs(newLocation.latitude - oldLocation.latitude);
+      const lngDiff = Math.abs(newLocation.longitude - oldLocation.longitude);
+      
+      if (latDiff > 0.000001 || lngDiff > 0.000001) {
+        console.log('📍 Ubicación actualizada:', newLocation);
+        this.updateMapLocation();
+      }
+    } else {
+      // Primera ubicación
+      console.log('📍 Primera ubicación obtenida:', newLocation);
+      this.updateMapLocation();
+    }
+    
+    this.cdr.detectChanges();
+  }
+
+  // 🗺️ INICIALIZAR MAPA CON LEAFLET
+  initializeMap() {
+    if (!this.selectedMascota?.ubicacionActual) {
+      console.warn('No hay datos de ubicación para mostrar en el mapa');
+      return;
+    }
+
+    this.mapLoading = true;
+    this.mapError = false;
+
+    try {
+      // Limpiar mapa existente
+      if (this.map) {
+        this.map.remove();
+      }
+
+      const location = this.selectedMascota.ubicacionActual;
+      const lat = location.latitude;
+      const lng = location.longitude;
+      const accuracy = location.accuracy || 10;
+
+      // Crear el mapa centrado en la ubicación de la mascota
+      this.map = L.map('pet-map', {
+        center: [lat, lng],
+        zoom: 16,
+        zoomControl: true,
+        attributionControl: true
+      });
+
+      // Añadir capa base del mapa (OpenStreetMap)
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 19
+      }).addTo(this.map);
+
+      // Crear icono personalizado para la mascota
+      const petIcon = L.divIcon({
+        html: this.getPetMapIcon(this.selectedMascota),
+        className: 'pet-marker',
+        iconSize: [40, 40],
+        iconAnchor: [20, 20],
+        popupAnchor: [0, -20]
+      });
+
+      // Añadir marcador de la mascota
+      this.petMarker = L.marker([lat, lng], { icon: petIcon })
+        .addTo(this.map)
+        .bindPopup(this.createPetPopupContent(this.selectedMascota))
+        .openPopup();
+
+      // Añadir círculo de precisión
+      this.accuracyCircle = L.circle([lat, lng], {
+        radius: accuracy,
+        color: '#007bff',
+        fillColor: '#007bff',
+        fillOpacity: 0.1,
+        weight: 2,
+        dashArray: '5, 5'
+      }).addTo(this.map);
+
+      // Ajustar vista para incluir el círculo de precisión
+      const group = new L.FeatureGroup([this.petMarker, this.accuracyCircle]);
+      this.map.fitBounds(group.getBounds(), { padding: [20, 20] });
+
+      this.mapLoading = false;
+      console.log('🗺️ Mapa inicializado correctamente');
+
+    } catch (error) {
+      console.error('❌ Error al inicializar el mapa:', error);
+      this.mapError = true;
+      this.mapLoading = false;
+    }
+  }
+
+  // 🎯 CENTRAR MAPA EN LA MASCOTA
+  centerMap() {
+    if (!this.map || !this.selectedMascota?.ubicacionActual) return;
+
+    const location = this.selectedMascota.ubicacionActual;
+    this.map.setView([location.latitude, location.longitude], 16);
+  }
+
+  // 🔄 ACTUALIZAR UBICACIÓN EN EL MAPA
+  refreshLocation() {
+    if (!this.selectedMascota) return;
+
+    // Simular actualización de ubicación (reemplazar con llamada real al API)
+    this.simulateLocationUpdate();
+    
+    // Actualizar el mapa con los nuevos datos
+    this.updateMapLocation();
+  }
+
+  // 🗺️ ACTUALIZAR MAPA CON NUEVA UBICACIÓN (sin reinicializar)
+  updateMapLocation() {
+    if (!this.map || !this.selectedMascota?.ubicacionActual) return;
+
+    const location = this.selectedMascota.ubicacionActual;
+    const lat = location.latitude;
+    const lng = location.longitude;
+    const accuracy = location.accuracy || 10;
+
+    try {
+      // Actualizar posición del marcador con animación suave
+      if (this.petMarker) {
+        // Animar el movimiento del marcador
+        const currentLatLng = this.petMarker.getLatLng();
+        const newLatLng = L.latLng(lat, lng);
+        
+        // Solo animar si la distancia es significativa pero no muy grande
+        const distance = currentLatLng.distanceTo(newLatLng);
+        if (distance > 1 && distance < 1000) { // Entre 1m y 1km
+          this.animateMarkerToPosition(currentLatLng, newLatLng);
+        } else {
+          this.petMarker.setLatLng([lat, lng]);
+        }
+        
+        // Actualizar el contenido del popup
+        this.petMarker.setPopupContent(this.createPetPopupContent(this.selectedMascota));
+        
+        // Actualizar el icono si el estado cambió
+        const newIcon = L.divIcon({
+          html: this.getPetMapIcon(this.selectedMascota),
+          className: 'pet-marker',
+          iconSize: [40, 40],
+          iconAnchor: [20, 20],
+          popupAnchor: [0, -20]
+        });
+        this.petMarker.setIcon(newIcon);
+      }
+
+      // Actualizar círculo de precisión con animación
+      if (this.accuracyCircle) {
+        this.accuracyCircle.setLatLng([lat, lng]);
+        this.accuracyCircle.setRadius(accuracy);
+        
+        // Cambiar color del círculo basado en la precisión
+        const color = accuracy < 10 ? '#28a745' : accuracy < 20 ? '#ffc107' : '#dc3545';
+        this.accuracyCircle.setStyle({ color: color, fillColor: color });
+      }
+
+      // Centrar suavemente el mapa en la nueva posición solo si está lejos del centro
+      const mapCenter = this.map.getCenter();
+      const newCenter = L.latLng(lat, lng);
+      if (mapCenter.distanceTo(newCenter) > 100) { // Solo si está más de 100m del centro
+        this.map.panTo([lat, lng], { animate: true, duration: 1 });
+      }
+
+      console.log('🗺️ Mapa actualizado con nueva ubicación:', { lat, lng, accuracy });
+
+    } catch (error) {
+      console.error('❌ Error al actualizar el mapa:', error);
+      // Si hay error, reinicializar el mapa completo
+      this.initializeMap();
+    }
+  }
+
+  // 🎬 ANIMAR MARCADOR A NUEVA POSICIÓN
+  animateMarkerToPosition(fromLatLng: L.LatLng, toLatLng: L.LatLng) {
+    if (!this.petMarker) return;
+
+    const steps = 20; // Número de pasos en la animación
+    const stepLat = (toLatLng.lat - fromLatLng.lat) / steps;
+    const stepLng = (toLatLng.lng - fromLatLng.lng) / steps;
+    let currentStep = 0;
+
+    const animateStep = () => {
+      if (currentStep < steps && this.petMarker) {
+        currentStep++;
+        const newLat = fromLatLng.lat + (stepLat * currentStep);
+        const newLng = fromLatLng.lng + (stepLng * currentStep);
+        
+        this.petMarker.setLatLng([newLat, newLng]);
+        
+        setTimeout(animateStep, 50); // 50ms entre pasos = 1s total
+      }
+    };
+
+    animateStep();
+  }
+
+  // 🏷️ CREAR ICONO DEL MAPA PARA LA MASCOTA
+  getPetMapIcon(mascota: any): string {
+    const petEmoji = mascota.tipo === 'Perro' ? '🐕' : '🐱';
+    const statusColor = this.getLocationStatusColor(mascota);
+    
+    return `
+      <div class="pet-map-icon" style="background-color: ${statusColor}">
+        <span class="pet-emoji">${petEmoji}</span>
+      </div>
+    `;
+  }
+
+  // 🎨 OBTENER COLOR DEL ESTADO DE UBICACIÓN
+  getLocationStatusColor(mascota: any): string {
+    const status = this.getLocationStatus(mascota);
+    switch (status) {
+      case 'online': return '#28a745';
+      case 'warning': return '#ffc107';
+      case 'offline': return '#dc3545';
+      default: return '#6c757d';
+    }
+  }
+
+  // 📋 CREAR CONTENIDO DEL POPUP
+  createPetPopupContent(mascota: any): string {
+    const location = mascota.ubicacionActual;
+    const lastUpdate = this.getLastLocationUpdate(mascota);
+    
+    return `
+      <div class="pet-popup">
+        <h4>${mascota.nombre}</h4>
+        <div class="popup-info">
+          <p><strong>📍 Coordenadas:</strong><br>
+             ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}</p>
+          <p><strong>🎯 Precisión:</strong> ${location.accuracy}m</p>
+          <p><strong>🏃 Velocidad:</strong> ${location.speed || 0} km/h</p>
+          <p><strong>📶 Método:</strong> ${location.method || 'GPS'}</p>
+          <p><strong>⏰ Actualizado:</strong> ${lastUpdate}</p>
+        </div>
+      </div>
+    `;
+  }
+
+  // 🎲 SIMULAR ACTUALIZACIÓN DE UBICACIÓN (temporal)
+  simulateLocationUpdate() {
+    if (!this.selectedMascota?.ubicacionActual) return;
+
+    const location = this.selectedMascota.ubicacionActual;
+    
+    // Pequeña variación en la ubicación para simular movimiento
+    location.latitude += (Math.random() - 0.5) * 0.0001;
+    location.longitude += (Math.random() - 0.5) * 0.0001;
+    location.accuracy = Math.floor(Math.random() * 15) + 5;
+    location.speed = Math.floor(Math.random() * 10);
+    location.timestamp = new Date().toISOString();
+    
+    console.log('🔄 Ubicación actualizada:', location);
   }
 
   verHistorial(mascota: any) {

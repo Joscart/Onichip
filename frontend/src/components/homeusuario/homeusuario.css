@@ -557,3 +557,315 @@ body {
     transform: scale(1) translateY(0);
   }
 }
+
+/* 🗺️ ===== ESTILOS DEL MAPA ===== */
+
+/* Modal del mapa más grande */
+.map-modal {
+  width: 90vw !important;
+  max-width: 1000px !important;
+  height: 80vh !important;
+  max-height: 700px !important;
+}
+
+.map-modal .modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  border-bottom: 1px solid #e9ecef;
+  background: linear-gradient(90deg, #4f46e5, #7c3aed);
+  color: white;
+  border-radius: 12px 12px 0 0;
+}
+
+.map-modal .modal-header h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.map-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.control-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.control-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
+}
+
+.control-btn.active {
+  background: rgba(40, 167, 69, 0.8);
+  border-color: rgba(40, 167, 69, 1);
+  animation: pulse-green 2s infinite;
+}
+
+@keyframes pulse-green {
+  0% {
+    box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(40, 167, 69, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(40, 167, 69, 0);
+  }
+}
+
+.close-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: bold;
+  transition: all 0.2s ease;
+}
+
+.close-btn:hover {
+  background: rgba(255, 0, 0, 0.8);
+}
+
+/* Información de ubicación sobre el mapa */
+.map-info {
+  background: linear-gradient(90deg, #f8f9fa, #e9ecef);
+  padding: 12px 24px;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.location-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 0.85rem;
+}
+
+.info-item {
+  background: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid #e9ecef;
+  font-weight: 500;
+}
+
+/* Contenedor principal del mapa */
+.map-container {
+  position: relative;
+  height: calc(100% - 120px);
+  min-height: 400px;
+  background: #f8f9fa;
+}
+
+/* Mapa Leaflet */
+.leaflet-map {
+  width: 100%;
+  height: 100%;
+  border-radius: 0 0 12px 12px;
+}
+
+/* Overlay de carga */
+.map-loading {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(248, 249, 250, 0.9);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #e9ecef;
+  border-top: 4px solid #4f46e5;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 12px;
+}
+
+.map-loading p {
+  color: #6c757d;
+  font-weight: 500;
+}
+
+/* Error del mapa */
+.map-error {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #f8f9fa;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 20px;
+}
+
+.map-error .emoji {
+  font-size: 3rem;
+  margin-bottom: 12px;
+}
+
+.map-error p {
+  color: #dc3545;
+  font-weight: 500;
+  margin-bottom: 16px;
+}
+
+.retry-btn {
+  background: #dc3545;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.2s ease;
+}
+
+.retry-btn:hover {
+  background: #c82333;
+}
+
+/* Sin ubicación */
+.no-location-map {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+  color: #6c757d;
+  padding: 20px;
+}
+
+.no-location-map .emoji {
+  font-size: 4rem;
+  margin-bottom: 16px;
+  opacity: 0.7;
+}
+
+.no-location-map h4 {
+  color: #495057;
+  margin-bottom: 8px;
+}
+
+.no-location-map p {
+  max-width: 300px;
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+
+/* 🏷️ Marcador personalizado de la mascota */
+.pet-marker {
+  background: none !important;
+  border: none !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pet-map-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  animation: pulse 2s infinite;
+}
+
+.pet-emoji {
+  font-size: 18px;
+}
+
+/* 📋 Popup personalizado */
+.pet-popup {
+  min-width: 200px;
+}
+
+.pet-popup h4 {
+  margin: 0 0 8px 0;
+  color: #2563eb;
+  border-bottom: 1px solid #e9ecef;
+  padding-bottom: 4px;
+}
+
+.popup-info p {
+  margin: 4px 0;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.popup-info strong {
+  color: #495057;
+}
+
+/* Animación del marcador */
+@keyframes pulse {
+  0% {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3), 0 0 0 0 rgba(79, 70, 229, 0.7);
+  }
+  70% {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3), 0 0 0 10px rgba(79, 70, 229, 0);
+  }
+  100% {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3), 0 0 0 0 rgba(79, 70, 229, 0);
+  }
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Responsive para el mapa */
+@media (max-width: 768px) {
+  .map-modal {
+    width: 95vw !important;
+    height: 85vh !important;
+  }
+  
+  .location-details {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .map-controls {
+    flex-wrap: wrap;
+  }
+  
+  .control-btn {
+    font-size: 0.8rem;
+    padding: 4px 8px;
+  }
+}
