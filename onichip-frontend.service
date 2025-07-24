@@ -1,0 +1,47 @@
+[Unit]
+Description=OnichipGPS Frontend Web Server
+Documentation=https://github.com/onichip/frontend
+After=network.target onichip-backend.service
+Wants=network.target
+Requires=onichip-backend.service
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/onichip/frontend
+Environment=NODE_ENV=production
+Environment=PORT=80
+Environment=BACKEND_URL=http://localhost:3000
+ExecStart=/usr/bin/node server-production.js
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=10
+KillMode=process
+TimeoutSec=300
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=onichip-frontend
+
+# Límites de recursos para AWS t2.micro/t3.micro
+LimitNOFILE=65536
+LimitNPROC=4096
+MemoryHigh=300M
+MemoryMax=400M
+
+# Security settings
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/onichip/frontend
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+
+# Capability para puerto 80 (privilegiado)
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+
+[Install]
+WantedBy=multi-user.target

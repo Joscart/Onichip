@@ -12,7 +12,13 @@
   },
   "scripts": {
     "start": "node servidor.js",
+    "prod": "NODE_ENV=production node servidor.js",
     "dev": "npx nodemon servidor.js",
-    "test": "echo \"No tests specified\" && exit 0"
+    "test": "echo \"No tests specified\" && exit 0",
+    "logs": "sudo journalctl -u onichip-backend -f",
+    "status": "sudo systemctl status onichip-backend",
+    "restart": "sudo systemctl restart onichip-backend",
+    "stop": "sudo systemctl stop onichip-backend",
+    "monitor": "pm2 monit"
   }
 }
