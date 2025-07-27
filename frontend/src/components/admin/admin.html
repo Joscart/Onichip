@@ -477,7 +477,7 @@
     </div>
 
     <!-- Vista Previa de Datos -->
-    <div *ngIf="reporteData && reporteData.length > 0" class="data-preview">
+    <div *ngIf="reporteData?.length" class="data-preview">
       <h4>Vista Previa del Reporte: {{ reporteFilters.tipoReporte }}</h4>
       <p><strong>Período:</strong> {{ reporteFilters.fechaInicio }} al {{ reporteFilters.fechaFin }}</p>
       <p><strong>Total de registros:</strong> {{ reporteData.total }}</p>
@@ -517,18 +517,17 @@
           </thead>
           <tbody>
             <!-- Dispositivos -->
-            <ng-container *ngIf="reporteFilters.tipoReporte === 'dispositivos'">
-              <tr *ngFor="let item of reporteData | slice:0:10">
-                <td>{{ item.id }}</td>
-                <td>{{ item.serial }}</td>
-                <td>{{ item.modelo }}</td>
-                <td>{{ item.estado }}</td>
-                <td>{{ item.bateria }}</td>
-                <td>{{ item.ultimaConexion | date:'short' }}</td>
-                <td>{{ item.mascota }}</td>
-                <td>{{ item.usuario }}</td>
-              </tr>
-            </ng-container>
+            <tr *ngFor="let item of reporteData | slice:0:10" 
+                [hidden]="reporteFilters.tipoReporte !== 'dispositivos'">
+              <td>{{ item.id }}</td>
+              <td>{{ item.serial }}</td>
+              <td>{{ item.modelo }}</td>
+              <td>{{ item.estado }}</td>
+              <td>{{ item.bateria }}</td>
+              <td>{{ item.ultimaConexion | date:'short' }}</td>
+              <td>{{ item.mascota }}</td>
+              <td>{{ item.usuario }}</td>
+            </tr>
             
             <!-- Ubicaciones -->
             <tr *ngFor="let item of reporteData.ubicaciones?.slice(0, 10)" 

@@ -16,6 +16,7 @@ interface AdminData {
   nombre?: string;
   email?: string;
   role?: string;
+  rol?: string; // Añadido para compatibilidad con el template
   token?: string;
   createdAt?: string;
   lastLogin?: string;
@@ -66,6 +67,8 @@ interface Usuario {
   telefono?: string;
   createdAt?: string;
   lastLogin?: string;
+  fechaRegistro?: string;
+  cantidadMascotas?: number;
   [key: string]: any;
 }
 
