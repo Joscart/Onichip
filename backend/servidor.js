@@ -26,6 +26,7 @@ const Mascota = require('./src/models/mascota');
 const Admin = require('./src/models/admin');
 const Recuperacion = require('./src/models/recuperacion');
 const DatosIoT = require('./src/models/datosiot');
+const Auditoria = require('./src/models/auditoria');
 const { Ubicacion, Geofence, WifiLocationCache } = require('./src/models/ubicacion');
 
 console.log('✅ Modelos registrados:', {
@@ -34,6 +35,7 @@ console.log('✅ Modelos registrados:', {
   Admin: !!Admin,
   Recuperacion: !!Recuperacion,
   DatosIoT: !!DatosIoT,
+  Auditoria: !!Auditoria,
   Ubicacion: !!Ubicacion,
   Geofence: !!Geofence,
   WifiLocationCache: !!WifiLocationCache
@@ -56,6 +58,17 @@ app.use(express.static('public'));
 app.use(express.text());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// ================================================
+// 🔍 MIDDLEWARE DE AUDITORÍA
+// ================================================
+
+// Importar middleware de auditoría
+const auditoriaMiddleware = require('./src/middlewares/auditoria');
+
+// Aplicar middleware de auditoría a todas las rutas
+// (captura automáticamente todas las operaciones)
+app.use(auditoriaMiddleware.capturarOperacion);
 
 // ================================================
 // 🗺️ RUTAS DE GPS Y GEOFENCING
@@ -100,11 +113,8 @@ app.use('/api/admin', require('./src/routes/admin.routes'));
 // 📊 RUTAS DE AUDITORÍA Y REPORTES
 // ================================================
 
-// Auditoría del sistema (si existe)
-// app.use('/api/auditoria', require('./src/routes/auditoria.routes'));
-
-// Reportes avanzados (si existe)
-// app.use('/api/reportes', require('./src/routes/reportes.routes'));
+// Auditoría del sistema
+app.use('/api/admin/auditoria', require('./src/routes/auditoria.routes'));
 
 // ================================================
 // 🔍 MIDDLEWARE DE LOGGING PERSONALIZADO
@@ -130,6 +140,7 @@ app.get('/', (req, res) => {
             mascotas: '/api/mascotas',
             usuarios: '/api/usuarios',
             admin: '/api/admin',
+            auditoria: '/api/admin/auditoria',
             gps: '/api/gps',
             geofences: '/api/geofences'
         },
