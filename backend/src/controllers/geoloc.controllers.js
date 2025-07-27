@@ -1,8 +1,33 @@
+/**
+ * ================================================
+ * 📶 GEOLOC CONTROLLER - GEOLOCALIZACIÓN POR WIFI
+ * ================================================
+ * 
+ * Controlador para geolocalización usando redes WiFi
+ * Utiliza Mozilla Location Service para triangulación
+ * 
+ * @author Onichip Team
+ * @version 2.0
+ */
+
 const axios = require('axios');
 
-// POST /api/geoloc/wifi
-// Recibe un array de redes WiFi y retorna lat/lon usando Mozilla Location Service
-// Espera: { wifiAccessPoints: [ { macAddress, signalStrength }, ... ] }
+/**
+ * 📶 Geolocalización por WiFi (Web)
+ * 
+ * @description Obtiene ubicación usando triangulación de redes WiFi cercanas
+ * @route POST /api/geoloc/wifi
+ * @access Public
+ * 
+ * @input {Object} req.body - Datos de redes WiFi
+ * @input {Array} req.body.wifiAccessPoints - Array de redes WiFi detectadas
+ * @input {string} req.body.wifiAccessPoints[].macAddress - MAC address de la red
+ * @input {number} req.body.wifiAccessPoints[].signalStrength - Intensidad de señal
+ * 
+ * @output {Object} 200 - Ubicación obtenida exitosamente
+ * @output {Object} 400 - No se recibieron redes WiFi válidas
+ * @output {Object} 500 - Error en geolocalización externa
+ */
 exports.geolocByWifi = async (req, res) => {
   const { wifiAccessPoints } = req.body;
   if (!wifiAccessPoints || !Array.isArray(wifiAccessPoints) || wifiAccessPoints.length === 0) {
@@ -22,8 +47,20 @@ exports.geolocByWifi = async (req, res) => {
   }
 };
 
-// POST /api/location/wifi
-// Endpoint específico para ESP32 - formato de respuesta compatible
+/**
+ * 📱 Geolocalización WiFi para ESP32
+ * 
+ * @description Endpoint específico para dispositivos ESP32 con formato compatible
+ * @route POST /api/location/wifi
+ * @access Device (ESP32)
+ * 
+ * @input {Object} req.body - Datos de redes WiFi del ESP32
+ * @input {Array} req.body.wifiAccessPoints - Array de redes WiFi detectadas
+ * 
+ * @output {Object} 200 - Ubicación obtenida con formato ESP32
+ * @output {Object} 400 - Datos insuficientes o inválidos
+ * @output {Object} 500 - Error en servicio de geolocalización
+ */
 exports.wifiLocation = async (req, res) => {
   try {
     const { wifiAccessPoints } = req.body;

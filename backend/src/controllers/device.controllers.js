@@ -1,3 +1,15 @@
+/**
+ * ================================================
+ * 📱 DEVICE CONTROLLER - GESTIÓN DE DISPOSITIVOS IOT
+ * ================================================
+ * 
+ * Controlador para dispositivos ESP32 y chips IoT
+ * Maneja datos de sensores, ubicación y telemetría
+ * 
+ * @author Onichip Team
+ * @version 2.0
+ */
+
 const mongoose = require('mongoose');
 const Mascota = require('../models/mascota');
 const DatosIoT = require('../models/datosiot');
@@ -5,7 +17,22 @@ const { Ubicacion } = require('../models/ubicacion');
 
 const deviceController = {};
 
-// 📱 Endpoint para recibir datos del ESP32 (PUT /api/dev/:deviceId)
+/**
+ * � Actualizar datos del dispositivo ESP32
+ * 
+ * @description Recibe y procesa datos telémétricos del chip IoT
+ * @route PUT /api/dev/:deviceId
+ * @access Device (ESP32)
+ * 
+ * @input {string} req.params.deviceId - ID único del dispositivo
+ * @input {Object} req.body - Datos del dispositivo
+ * @input {Object} req.body.bateria - Datos de batería
+ * @input {Object} req.body.sensores - Datos de sensores
+ * 
+ * @output {Object} 200 - Datos procesados exitosamente
+ * @output {Object} 404 - Dispositivo no registrado
+ * @output {Object} 500 - Error interno del servidor
+ */
 deviceController.updateDeviceData = async (req, res) => {
     try {
         const { deviceId } = req.params;

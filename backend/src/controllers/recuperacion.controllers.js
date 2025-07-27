@@ -1,9 +1,32 @@
+/**
+ * ================================================
+ * 🔑 RECUPERACIÓN CONTROLLER - RECUPERACIÓN DE CONTRASEÑAS
+ * ================================================
+ * 
+ * Controlador para recuperación de contraseñas de usuarios
+ * Incluye validación de email y cambio de contraseña
+ * 
+ * @author Onichip Team
+ * @version 2.0
+ */
+
 const bcrypt = require('bcryptjs');
 const Usuario = require('../models/usuario');
 
 console.log('🔧 Controladores de recuperación cargados');
 
-// Endpoint de prueba simple
+/**
+ * 🔍 Test de conexión
+ * 
+ * @description Endpoint de prueba para verificar funcionamiento del servidor
+ * @route GET /api/test
+ * @access Public
+ * 
+ * @input None - No requiere parámetros
+ * 
+ * @output {Object} 200 - Servidor funcionando correctamente
+ * @output {Object} 500 - Error interno del servidor
+ */
 const testConexion = async (req, res) => {
   try {
     console.log('🔍 Test de conexión iniciado');
@@ -17,7 +40,21 @@ const testConexion = async (req, res) => {
   }
 };
 
-// Validar email y permitir cambio de contraseña
+/**
+ * 📧 Validar email para recuperación
+ * 
+ * @description Valida si un email existe en el sistema para permitir recuperación
+ * @route POST /api/validar-email
+ * @access Public
+ * 
+ * @input {Object} req.body - Datos de validación
+ * @input {string} req.body.email - Email a validar
+ * 
+ * @output {Object} 200 - Email válido, puede proceder con recuperación
+ * @output {Object} 400 - Email requerido
+ * @output {Object} 404 - No existe cuenta con ese email
+ * @output {Object} 500 - Error interno del servidor
+ */
 const validarEmail = async (req, res) => {
   console.log('📧 Validando email:', req.body);
   try {

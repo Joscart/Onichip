@@ -1,11 +1,26 @@
-const express = require('express')
-const app = express()
-const port = 3000
+/**
+ * ================================================
+ * 🚀 SERVIDOR PRINCIPAL - ONICHIP BACKEND
+ * ================================================
+ * 
+ * Servidor Express.js para el sistema de localización de mascotas
+ * Incluye GPS, WiFi location, geofencing y panel de administración
+ * 
+ * @author Onichip Team
+ * @version 2.0
+ * @port 3000
+ */
+
+const express = require('express');
+const app = express();
+const port = 3000;
 const morgan = require('morgan'); 
 const cors = require('cors');
 const mongoose = require('./src/database');
 
-// Importar y registrar modelos explícitamente
+// ================================================
+//  IMPORTAR Y REGISTRAR MODELOS
+// ================================================
 const Usuario = require('./src/models/usuario');
 const Mascota = require('./src/models/mascota');
 const Admin = require('./src/models/admin');
@@ -24,44 +39,112 @@ console.log('✅ Modelos registrados:', {
   WifiLocationCache: !!WifiLocationCache
 });
 
-// Habilitar CORS
+// ================================================
+// 🔧 MIDDLEWARES DE CONFIGURACIÓN
+// ================================================
+
+// Habilitar CORS para frontend
 app.use(cors());
 
-// Middleware para manejar el cuerpo de las solicitudes
-
+// Logging de peticiones HTTP
 app.use(morgan('dev'));
 
-app.use(express.static('public')); // Servir archivos estáticos desde la carpeta 'public' 
+// Servir archivos estáticos
+app.use(express.static('public'));
     
-// Middleware para manejar el cuerpo de las solicitudes
+// Middlewares para manejo del cuerpo de las solicitudes
 app.use(express.text());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// 🗺️ RUTAS GPS Y GEOFENCING (NUEVAS)
+// ================================================
+// 🗺️ RUTAS DE GPS Y GEOFENCING
+// ================================================
+
+// GPS y localización
 app.use('/api/gps', require('./src/routes/gps.routes'));
+
+// Geofencing y zonas seguras
 app.use('/api/geofences', require('./src/routes/geofence.routes'));
 
-// Rutas existentes
-app.use('/api', require('./src/routes/mascotas.routes'));
-// Rutas de dispositivos ESP32
-app.use('/api', require('./src/routes/device.routes'));
-// Ruta de geolocalización por WiFi
+// Geolocalización por WiFi
 app.use('/api', require('./src/routes/geoloc.routes'));
-// Rutas de usuarios
+
+// ================================================
+// 🐕 RUTAS PRINCIPALES DEL SISTEMA
+// ================================================
+
+// Mascotas y dispositivos IoT
+app.use('/api', require('./src/routes/mascotas.routes'));
+
+// Dispositivos ESP32
+app.use('/api', require('./src/routes/device.routes'));
+
+// Usuarios del sistema
 app.use('/api', require('./src/routes/usuarios.routes'));
-// Rutas de recuperación de contraseña
-app.use('/api', require('./src/routes/recuperacion.routes'));
-// Rutas de administrador
-app.use('/api/admin', require('./src/routes/admin.routes'));
-// Rutas de autenticación
+
+// ================================================
+// 🔐 RUTAS DE AUTENTICACIÓN Y SEGURIDAD
+// ================================================
+
+// Autenticación general
 app.use('/api', require('./src/routes/auth.routes'));
 
-function logger(req,res,next){
- console.log('Ruta Recibida '+ req.protocol+'://'+req.get('host')+ req.originalUrl);
- next();
+// Recuperación de contraseñas
+app.use('/api', require('./src/routes/recuperacion.routes'));
+
+// Panel de administración
+app.use('/api/admin', require('./src/routes/admin.routes'));
+
+// ================================================
+// 📊 RUTAS DE AUDITORÍA Y REPORTES
+// ================================================
+
+// Auditoría del sistema (si existe)
+// app.use('/api/auditoria', require('./src/routes/auditoria.routes'));
+
+// Reportes avanzados (si existe)
+// app.use('/api/reportes', require('./src/routes/reportes.routes'));
+
+// ================================================
+// 🔍 MIDDLEWARE DE LOGGING PERSONALIZADO
+// ================================================
+
+function logger(req, res, next) {
+    console.log(`📡 Ruta recibida: ${req.protocol}://${req.get('host')}${req.originalUrl}`);
+    console.log(`📅 Timestamp: ${new Date().toISOString()}`);
+    console.log(`🔧 Método: ${req.method}`);
+    next();
 }
 
+// ================================================
+// 🏠 RUTA DE BIENVENIDA
+// ================================================
+
+app.get('/', (req, res) => {
+    res.json({
+        message: '🐕 Bienvenido a Onichip - Sistema de Localización de Mascotas',
+        version: '2.0',
+        status: 'Servidor funcionando correctamente',
+        endpoints: {
+            mascotas: '/api/mascotas',
+            usuarios: '/api/usuarios',
+            admin: '/api/admin',
+            gps: '/api/gps',
+            geofences: '/api/geofences'
+        },
+        timestamp: new Date().toISOString()
+    });
+});
+
+// ================================================
+// 🚀 INICIO DEL SERVIDOR
+// ================================================
+
 app.listen(port, () => {
-  console.log(`Servidor escuchando en el puerto ${port}`);
+    console.log(`🚀 Servidor Onichip iniciado exitosamente`);
+    console.log(`📡 Puerto: ${port}`);
+    console.log(`🌐 URL: http://localhost:${port}`);
+    console.log(`📅 Fecha de inicio: ${new Date().toISOString()}`);
+    console.log('==========================================');
 });

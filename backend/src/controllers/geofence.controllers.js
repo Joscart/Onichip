@@ -1,9 +1,41 @@
+/**
+ * ================================================
+ * 🗺️ GEOFENCE CONTROLLER - GESTIÓN DE GEOCERCAS
+ * ================================================
+ * 
+ * Controlador para gestión de geofences (geocercas virtuales)
+ * Permite crear, editar y monitorear zonas seguras para mascotas
+ * 
+ * @author Onichip Team
+ * @version 2.0
+ */
+
 const { Geofence } = require('../models/ubicacion');
 const Mascota = require('../models/mascota');
 
 const geofenceController = {};
 
-// 🗺️ CREAR NUEVO GEOFENCE
+/**
+ * 🗺️ Crear nuevo geofence
+ * 
+ * @description Crea una nueva geocerca virtual para una mascota
+ * @route POST /api/geofences
+ * @access Private (Usuario)
+ * 
+ * @input {Object} req.body - Datos del geofence
+ * @input {string} req.body.mascotaId - ID de la mascota
+ * @input {string} req.body.name - Nombre del geofence
+ * @input {string} req.body.description - Descripción del geofence
+ * @input {Object} req.body.geometry - Geometría (Circle/Polygon)
+ * @input {string} req.body.color - Color del geofence en el mapa
+ * @input {string} req.body.icon - Icono del geofence
+ * @input {Object} req.body.alertSettings - Configuración de alertas
+ * 
+ * @output {Object} 201 - Geofence creado exitosamente
+ * @output {Object} 400 - Geometría inválida
+ * @output {Object} 404 - Mascota no encontrada
+ * @output {Object} 500 - Error interno del servidor
+ */
 geofenceController.createGeofence = async (req, res) => {
     try {
         const { 

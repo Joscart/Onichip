@@ -1,10 +1,41 @@
+/**
+ * ================================================
+ * 🔐 AUTH CONTROLLER - AUTENTICACIÓN UNIFICADA
+ * ================================================
+ * 
+ * Controlador para autenticación unificada del sistema
+ * Maneja login de usuarios y administradores según dominio
+ * 
+ * @author Onichip Team
+ * @version 2.0
+ */
+
 const Usuario = require('../models/usuario');
 const Admin = require('../models/admin');
 const bcrypt = require('bcryptjs');
 
 const authController = {};
-// POST /api/admin/create
-// Solo el superadmin puede crear nuevos administradores
+
+/**
+ * 👨‍💼 Crear nuevo administrador
+ * 
+ * @description Solo el superadministrador puede crear nuevos administradores
+ * @route POST /api/admin/create
+ * @access Super Admin Only
+ * 
+ * @input {Object} req.body - Datos del superadmin y nuevo admin
+ * @input {string} req.body.superAdminEmail - Email del superadministrador
+ * @input {string} req.body.superAdminPassword - Contraseña del superadministrador
+ * @input {string} req.body.nombre - Nombre del nuevo administrador
+ * @input {string} req.body.email - Email del nuevo administrador
+ * @input {string} req.body.password - Contraseña del nuevo administrador
+ * 
+ * @output {Object} 200 - Administrador creado exitosamente
+ * @output {Object} 400 - Faltan datos o administrador ya existe
+ * @output {Object} 401 - Contraseña de superadmin incorrecta
+ * @output {Object} 403 - No autorizado (no es superadmin)
+ * @output {Object} 500 - Error interno del servidor
+ */
 authController.createAdmin = async (req, res) => {
   const { superAdminEmail, superAdminPassword, nombre, email, password } = req.body;
   if (!superAdminEmail || !superAdminPassword || !nombre || !email || !password) {
@@ -28,8 +59,22 @@ authController.createAdmin = async (req, res) => {
   }
 };
 
-// POST /api/login
-// Login de usuario o admin según dominio del email
+/**
+ * 🔐 Login unificado
+ * 
+ * @description Login de usuario o admin según dominio del email
+ * @route POST /api/login
+ * @access Public
+ * 
+ * @input {Object} req.body - Credenciales de login
+ * @input {string} req.body.email - Email (determina si es admin o usuario)
+ * @input {string} req.body.password - Contraseña
+ * 
+ * @output {Object} 200 - Login exitoso con tipo de usuario
+ * @output {Object} 400 - Email y contraseña requeridos
+ * @output {Object} 401 - Usuario/Admin no encontrado o contraseña incorrecta
+ * @output {Object} 500 - Error interno del servidor
+ */
 authController.login = async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ message: 'Email y contraseña requeridos' });

@@ -1,20 +1,87 @@
+/**
+ * ================================================
+ * 👥 USUARIOS CONTROLLER - GESTIÓN DE USUARIOS
+ * ================================================
+ * 
+ * Controlador para operaciones CRUD de usuarios del sistema
+ * Incluye registro, autenticación y gestión de perfiles
+ * 
+ * @author Onichip Team
+ * @version 2.0
+ */
+
 const Usuario = require('../models/usuario');
 const bcrypt = require('bcryptjs');
 const usuariosController = {};
 
-// GET todos los usuarios
+/**
+ * 👥 Obtener todos los usuarios
+ * 
+ * @description Obtiene lista de todos los usuarios registrados con sus mascotas
+ * @route GET /api/usuarios
+ * @access Public
+ * 
+ * @input None - No requiere parámetros
+ * 
+ * @output {Array} 200 - Lista de usuarios con mascotas pobladas
+ * @output {Object} 500 - Error interno del servidor
+ */
 usuariosController.getUsuarios = async (req, res) => {
-    const usuarios = await Usuario.find().populate('mascotas');
-    res.json(usuarios);
+    try {
+        const usuarios = await Usuario.find().populate('mascotas');
+        console.log(`✅ ${usuarios.length} usuarios obtenidos exitosamente`);
+        res.json(usuarios);
+    } catch (error) {
+        console.error('❌ Error al obtener usuarios:', error);
+        res.status(500).json({ message: 'Error al obtener usuarios' });
+    }
 };
 
-// GET usuario por ID
+/**
+ * 👤 Obtener usuario por ID
+ * 
+ * @description Obtiene un usuario específico con sus mascotas
+ * @route GET /api/usuarios/:id
+ * @access Public
+ * 
+ * @input {string} req.params.id - ID del usuario a buscar
+ * 
+ * @output {Object} 200 - Usuario encontrado con mascotas pobladas
+ * @output {Object} 404 - Usuario no encontrado
+ * @output {Object} 500 - Error interno del servidor
+ */
 usuariosController.getUsuario = async (req, res) => {
-    const usuario = await Usuario.findById(req.params.id).populate('mascotas');
-    res.json(usuario);
+    try {
+        const usuario = await Usuario.findById(req.params.id).populate('mascotas');
+        
+        if (!usuario) {
+            return res.status(404).json({ message: 'Usuario no encontrado' });
+        }
+        
+        console.log(`✅ Usuario obtenido: ${usuario.nombre}`);
+        res.json(usuario);
+    } catch (error) {
+        console.error('❌ Error al obtener usuario:', error);
+        res.status(500).json({ message: 'Error al obtener usuario' });
+    }
 };
 
-// POST nuevo usuario
+/**
+ * ➕ Crear nuevo usuario
+ * 
+ * @description Registra un nuevo usuario en el sistema con validaciones
+ * @route POST /api/usuarios
+ * @access Public
+ * 
+ * @input {Object} req.body - Datos del usuario
+ * @input {string} req.body.nombre - Nombre completo del usuario
+ * @input {string} req.body.email - Email único del usuario
+ * @input {string} req.body.password - Contraseña (será encriptada)
+ * 
+ * @output {Object} 201 - Usuario creado exitosamente
+ * @output {Object} 400 - Error de validación (duplicados, campos faltantes)
+ * @output {Object} 500 - Error interno del servidor
+ */
 usuariosController.addUsuario = async (req, res) => {
     console.log('🔍 Iniciando validación de registro...');
     console.time('⏱️ Tiempo de validación');

@@ -1,3 +1,15 @@
+/**
+ * ================================================
+ * 🗺️ GPS CONTROLLER - GESTIÓN DE UBICACIONES GPS
+ * ================================================
+ * 
+ * Controlador para manejo de ubicaciones GPS y geofencing
+ * Procesa datos de ubicación desde dispositivos ESP32
+ * 
+ * @author Onichip Team
+ * @version 2.0
+ */
+
 const { Ubicacion, Geofence, WifiLocationCache } = require('../models/ubicacion');
 const Mascota = require('../models/mascota');
 const Usuario = require('../models/usuario');
@@ -6,7 +18,26 @@ const crypto = require('crypto');
 
 const gpsController = {};
 
-// 🗺️ RECIBIR DATOS DE UBICACIÓN DESDE ESP32
+/**
+ * � Recibir datos de ubicación desde ESP32
+ * 
+ * @description Procesa y almacena datos de ubicación GPS desde dispositivos IoT
+ * @route POST /api/gps/location/:deviceId
+ * @access Device (ESP32)
+ * 
+ * @input {string} req.params.deviceId - ID único del dispositivo
+ * @input {Object} req.body - Datos de ubicación
+ * @input {Object} req.body.location - Coordenadas GPS
+ * @input {number} req.body.location.latitude - Latitud
+ * @input {number} req.body.location.longitude - Longitud
+ * @input {number} req.body.battery - Nivel de batería
+ * @input {string} req.body.timestamp - Timestamp de la ubicación
+ * 
+ * @output {Object} 200 - Ubicación procesada exitosamente
+ * @output {Object} 400 - Datos de ubicación incompletos
+ * @output {Object} 404 - Dispositivo no encontrado
+ * @output {Object} 500 - Error interno del servidor
+ */
 gpsController.receiveLocation = async (req, res) => {
     try {
         const { deviceId } = req.params;
