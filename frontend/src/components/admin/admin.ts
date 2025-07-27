@@ -78,7 +78,7 @@ interface Mascota {
   especie: string;
   raza?: string;
   edad?: number;
-  propietario: string;
+  propietario: string | { nombre: string; [key: string]: any };
   createdAt?: string;
   [key: string]: any;
 }
@@ -90,6 +90,8 @@ interface AuditoriaEvento {
   usuario?: string;
   mascota?: string;
   dispositivo?: string;
+  icono?: string;
+  titulo?: string;
   [key: string]: any;
 }
 
@@ -112,12 +114,15 @@ interface DispositivoItem {
 }
 
 interface ReporteItem {
-  deviceId: string;
+  deviceId?: string;
+  id?: string;
   serial: string;
   modelo: string;
   estado: string;
   bateria: string;
   ultimaConexion: string;
+  mascota?: string;
+  usuario?: string;
 }
 
 interface UbicacionItem {
@@ -126,9 +131,29 @@ interface UbicacionItem {
   lat: number;
   lng: number;
   accuracy: number;
+  mascota?: string;
+  latitude?: number;
+  longitude?: number;
+  speed?: number;
+  method?: string;
+  battery?: string;
 }
 
-type ReporteData = ReporteItem[] | UbicacionItem[];
+interface AlertaItem {
+  timestamp?: string;
+  tipo?: string;
+  prioridad?: string;
+  mensaje?: string;
+  dispositivo?: string;
+  estado?: string;
+}
+
+interface ReporteData {
+  total: number;
+  data: ReporteItem[] | UbicacionItem[] | AlertaItem[];
+  ubicaciones?: UbicacionItem[];
+  alertas?: AlertaItem[];
+}
 
 @Component({
   selector: 'app-admin',
@@ -200,19 +225,19 @@ export class Admin implements OnInit, AfterViewInit {
   filtroAlertas = 'todas';
   filtroReporte = 'hoy';
   formatoExport: 'frontend' | 'backend' = 'frontend';
-  
+
   // Paginación
   usuariosPage = 1;
   usuariosTotal = 0;
   mascotasPage = 1;
   mascotasTotal = 0;
-  
+
   // Búsqueda y UI
   searchTerm = '';
   activeTab = 'dashboard';
   tiempoRealActivo = false;
   ultimaActualizacion = '2 minutos';
-  
+
   // Formularios y modales
   usuarioForm!: FormGroup;
   mascotaForm!: FormGroup;
@@ -228,7 +253,7 @@ export class Admin implements OnInit, AfterViewInit {
     fechaFin: undefined,
     mascotaId: undefined
   };
-  reporteData: ReporteData = [];
+  reporteData: ReporteData = { total: 0, data: [] };
   chartData: ChartData | null = null;
   dashboardCharts: DashboardCharts = {
     pieChart: null,
@@ -299,11 +324,11 @@ export class Admin implements OnInit, AfterViewInit {
         email: this.loginForm.get('email')?.value,
         password: this.loginForm.get('password')?.value
       };
-      
+
       // Use the specific admin login endpoint
       const response = await fetch('http://localhost:3000/api/admin/login', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
@@ -338,7 +363,7 @@ export class Admin implements OnInit, AfterViewInit {
   // ==== CARGA DE DATOS ====
   private async loadDashboardData(): Promise<void> {
     if (!this.isLoggedIn) return;
-    
+
     this.loadingStats = true;
     try {
       await Promise.all([
@@ -370,7 +395,7 @@ export class Admin implements OnInit, AfterViewInit {
         mascotasPorEspecie: [],
         mascotasRegistradas: 0
       };
-      
+
       const response = await fetch('http://localhost:3000/api/admin/dashboard-stats');
       if (!response.ok) throw new Error('Error loading stats');
       const data = await response.json();
@@ -438,14 +463,14 @@ export class Admin implements OnInit, AfterViewInit {
   // ==== GESTIÓN DE USUARIOS ====
   async saveUsuario(): Promise<void> {
     if (this.usuarioForm.invalid) return;
-    
+
     this.loading = true;
     try {
       const userData = this.usuarioForm.value;
-      const url = this.editingUsuario 
+      const url = this.editingUsuario
         ? `http://localhost:3000/api/admin/usuarios/${this.editingUsuario._id}`
         : 'http://localhost:3000/api/admin/usuarios';
-      
+
       const response = await fetch(url, {
         method: this.editingUsuario ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -490,7 +515,7 @@ export class Admin implements OnInit, AfterViewInit {
 
   openUsuarioModal(usuario?: Usuario): void {
     this.editingUsuario = usuario || null;
-    
+
     if (usuario) {
       this.usuarioForm.patchValue({
         nombre: usuario.nombre,
@@ -502,7 +527,7 @@ export class Admin implements OnInit, AfterViewInit {
     } else {
       this.usuarioForm.reset();
       this.usuarioForm.get('password')?.setValidators([
-        Validators.required, 
+        Validators.required,
         Validators.minLength(6)
       ]);
       this.usuarioForm.get('password')?.updateValueAndValidity();
@@ -520,14 +545,14 @@ export class Admin implements OnInit, AfterViewInit {
   // ==== GESTIÓN DE MASCOTAS ====
   async saveMascota(): Promise<void> {
     if (this.mascotaForm.invalid) return;
-    
+
     this.loading = true;
     try {
       const mascotaData = this.mascotaForm.value;
-      const url = this.editingMascota 
+      const url = this.editingMascota
         ? `http://localhost:3000/api/admin/mascotas/${this.editingMascota._id}`
         : 'http://localhost:3000/api/admin/mascotas';
-      
+
       const response = await fetch(url, {
         method: this.editingMascota ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -572,7 +597,7 @@ export class Admin implements OnInit, AfterViewInit {
 
   openMascotaModal(mascota?: Mascota): void {
     this.editingMascota = mascota || null;
-    
+
     if (mascota) {
       this.mascotaForm.patchValue({
         nombre: mascota.nombre,
@@ -764,12 +789,12 @@ export class Admin implements OnInit, AfterViewInit {
       }
 
       this.chartData = await response.json();
-      
+
       if (!(window as any).Chart) {
         await this.loadChartJS();
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
-      
+
       setTimeout(() => this.createCharts(), 200);
     } catch (error) {
       console.error('Error loading dashboard:', error);
@@ -786,12 +811,12 @@ export class Admin implements OnInit, AfterViewInit {
   // Interfaces para el reporte
   async generateReport(): Promise<void> {
     if (this.generatingReport) return;
-    
+
     this.generatingReport = true;
     this.reportProgress = 0;
     this.currentOperation = 'Iniciando generación del reporte...';
-    this.reporteData = [];
-    
+    this.reporteData = { total: 0, data: [] };
+
     try {
       // Reiniciar estado
       const exportButtons = document.querySelectorAll('.export-button');
@@ -804,7 +829,7 @@ export class Admin implements OnInit, AfterViewInit {
       this.currentOperation = 'Conectando con el servidor...';
       this.reportProgress = 10;
       this.cdr.detectChanges();
-      
+
       const requestData = {
         tipoReporte: this.reporteFilters.tipoReporte || 'dispositivos',
         fechaInicio: this.reporteFilters.fechaInicio,
@@ -813,10 +838,10 @@ export class Admin implements OnInit, AfterViewInit {
       };
 
       console.log('Enviando solicitud:', requestData);
-      
+
       const response = await fetch('http://localhost:3000/api/admin/generate-report', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Cache-Control': 'no-cache'
         },
@@ -826,7 +851,7 @@ export class Admin implements OnInit, AfterViewInit {
       if (!response.ok) {
         throw new Error(`Error del servidor: ${response.status}`);
       }
-      
+
       this.currentOperation = 'Procesando datos...';
       this.reportProgress = 50;
       this.cdr.detectChanges();
@@ -870,27 +895,35 @@ export class Admin implements OnInit, AfterViewInit {
           reportData = reportData.filter(item => item.mascota === this.mascotas.find(m => m._id === this.reporteFilters.mascotaId)?.nombre);
         }
         total = reportData.length;
-        this.reporteData = reportData;
-        (this.reporteData as any).total = total;
+        this.reporteData = {
+          total: total,
+          data: reportData,
+          ubicaciones: this.reporteFilters.tipoReporte === 'ubicaciones' ? reportData : undefined,
+          alertas: this.reporteFilters.tipoReporte === 'alertas' ? reportData : undefined
+        };
       } else if (data.tipo === 'ubicaciones' && Array.isArray(data.ubicaciones)) {
         reportData = data.ubicaciones;
         if (this.reporteFilters.mascotaId) {
           reportData = reportData.filter(item => item.mascotaId === this.reporteFilters.mascotaId);
         }
         total = reportData.length;
-        this.reporteData = reportData;
-        (this.reporteData as any).total = total;
+        this.reporteData = {
+          total: total,
+          data: reportData,
+          ubicaciones: reportData
+        };
       } else if (data.tipo === 'mascotas' && Array.isArray(data.mascotas)) {
         reportData = data.mascotas;
         if (this.reporteFilters.mascotaId) {
           reportData = reportData.filter(item => item._id === this.reporteFilters.mascotaId);
         }
         total = reportData.length;
-        this.reporteData = reportData;
-        (this.reporteData as any).total = total;
+        this.reporteData = {
+          total: total,
+          data: reportData
+        };
       } else {
-        this.reporteData = [];
-        (this.reporteData as any).total = 0;
+        this.reporteData = { total: 0, data: [] };
       }
 
       // Actualizar UI
@@ -906,10 +939,10 @@ export class Admin implements OnInit, AfterViewInit {
           (btn as HTMLButtonElement).disabled = false;
         });
       });
-      
+
     } catch (error: any) {
       console.error('Error al generar reporte:', error);
-      
+
       // Determinar mensaje de error más específico
       let errorMessage = 'Error desconocido';
       if (error.message.includes('formato de respuesta')) {
@@ -919,15 +952,15 @@ export class Admin implements OnInit, AfterViewInit {
       } else {
         errorMessage = error.message || 'Error al generar el reporte';
       }
-      
+
       // Actualizar UI con el error
       this.currentOperation = `Error: ${errorMessage}`;
       this.reportProgress = 0;
       this.cdr.detectChanges();
-      
+
       // Mostrar alerta al usuario con más detalles
       alert(`Error al generar el reporte:\n${errorMessage}`);
-      
+
       // Reiniciar estado de botones
       const exportButtons = document.querySelectorAll('.export-button');
       exportButtons.forEach(btn => {
@@ -941,7 +974,7 @@ export class Admin implements OnInit, AfterViewInit {
   }
 
   async exportToPDF(): Promise<void> {
-    if (this.reporteData.length === 0) {
+    if (this.reporteData.total === 0) {
       alert('Primero debe generar un reporte');
       return;
     }
@@ -958,17 +991,17 @@ export class Admin implements OnInit, AfterViewInit {
           { text: `Reporte de ${this.reporteFilters.tipoReporte}`, style: 'header' },
           { text: `Generado el ${new Date().toLocaleDateString()}`, style: 'subheader' },
           { text: '\n' }, // Espacio
-          { 
+          {
             table: {
               headerRows: 1,
               widths: ['auto', 'auto', 'auto', 'auto', 'auto', 'auto'],
               body: [
                 // Encabezados según tipo de reporte
-                this.reporteFilters.tipoReporte === 'dispositivos' 
+                this.reporteFilters.tipoReporte === 'dispositivos'
                   ? ['ID', 'Serial', 'Modelo', 'Estado', 'Batería', 'Última Conexión']
                   : ['Campo no disponible'],
                 // Datos
-                ...this.reporteData.map((item: any) => 
+                ...this.reporteData.data.map((item: any) =>
                   this.reporteFilters.tipoReporte === 'dispositivos'
                     ? [
                         item.deviceId || 'N/A',
@@ -1007,7 +1040,7 @@ export class Admin implements OnInit, AfterViewInit {
   }
 
   private getPDFContent() {
-    if (!this.reporteData || !Array.isArray(this.reporteData)) {
+    if (!this.reporteData || !Array.isArray(this.reporteData.data)) {
       return { text: 'No hay datos disponibles' };
     }
 
@@ -1020,7 +1053,7 @@ export class Admin implements OnInit, AfterViewInit {
             widths: ['*', '*', '*', '*'],
             body: [
               ['Fecha', 'Latitud', 'Longitud', 'Precisión'],
-              ...this.reporteData.map(item => {
+              ...this.reporteData.data.map(item => {
                 const ubicacion = item as UbicacionItem;
                 return [
                   new Date(ubicacion.fecha || ubicacion.timestamp || '').toLocaleString(),
@@ -1039,7 +1072,7 @@ export class Admin implements OnInit, AfterViewInit {
             widths: ['*', '*', '*', '*', '*', '*'],
             body: [
               ['ID', 'Serial', 'Modelo', 'Estado', 'Batería', 'Última Conexión'],
-              ...this.reporteData.map(item => {
+              ...this.reporteData.data.map(item => {
                 const dispositivo = item as ReporteItem;
                 return [
                   dispositivo.deviceId || 'N/A',
@@ -1059,7 +1092,7 @@ export class Admin implements OnInit, AfterViewInit {
   }
 
   async exportToExcel(): Promise<void> {
-    if (this.reporteData.length === 0) {
+    if (this.reporteData.total === 0) {
       alert('Primero debe generar un reporte');
       return;
     }
@@ -1070,7 +1103,7 @@ export class Admin implements OnInit, AfterViewInit {
         // Generar Excel en el frontend
         const workbook = new ExcelJS.Workbook();
         const worksheet = workbook.addWorksheet('Reporte');
-        
+
         // Configurar columnas según el tipo de reporte
         switch (this.reporteFilters.tipoReporte) {
           case 'ubicaciones':
@@ -1092,7 +1125,7 @@ export class Admin implements OnInit, AfterViewInit {
             ];
 
             // Formatear los datos
-            const formattedData = this.reporteData.map((item: any) => ({
+            const formattedData = this.reporteData.data.map((item: any) => ({
               deviceId: item.deviceId || item.id || 'N/A',
               serial: item.serial || 'N/A',
               modelo: item.modelo || 'N/A',
@@ -1100,7 +1133,7 @@ export class Admin implements OnInit, AfterViewInit {
               bateria: item.bateria || 'N/A',
               ultimaConexion: item.ultimaConexion ? new Date(item.ultimaConexion).toLocaleString() : 'N/A'
             }));
-            
+
             worksheet.addRows(formattedData);
             break;
           case 'mascotas':
@@ -1115,8 +1148,8 @@ export class Admin implements OnInit, AfterViewInit {
         }
 
         // Agregar datos
-        if (Array.isArray(this.reporteData)) {
-          worksheet.addRows(this.reporteData);
+        if (Array.isArray(this.reporteData.data)) {
+          worksheet.addRows(this.reporteData.data);
         }
 
         // Dar formato a las columnas
@@ -1131,8 +1164,8 @@ export class Admin implements OnInit, AfterViewInit {
 
         // Generar archivo
         const buffer = await workbook.xlsx.writeBuffer();
-        const blob = new Blob([buffer], { 
-          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+        const blob = new Blob([buffer], {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -1176,10 +1209,10 @@ export class Admin implements OnInit, AfterViewInit {
   // ==== NAVEGACIÓN Y UI ====
   setActiveTab(tab: string): void {
     if (this.loading) return;
-    
+
     this.activeTab = tab;
     this.searchTerm = '';
-    
+
     switch (tab) {
       case 'usuarios':
         this.loadUsers();
@@ -1208,6 +1241,34 @@ export class Admin implements OnInit, AfterViewInit {
 
   getShortId(id: string): string {
     return id.slice(-6);
+  }
+
+  getReporteDataSlice(limit: number = 10): any[] {
+    if (!this.reporteData?.data || !Array.isArray(this.reporteData.data)) {
+      return [];
+    }
+    return this.reporteData.data.slice(0, limit);
+  }
+
+  getUbicacionesSlice(limit: number = 10): UbicacionItem[] {
+    if (!this.reporteData?.ubicaciones || !Array.isArray(this.reporteData.ubicaciones)) {
+      return [];
+    }
+    return this.reporteData.ubicaciones.slice(0, limit);
+  }
+
+  getAlertasSlice(limit: number = 10): AlertaItem[] {
+    if (!this.reporteData?.alertas || !Array.isArray(this.reporteData.alertas)) {
+      return [];
+    }
+    return this.reporteData.alertas.slice(0, limit);
+  }
+
+  getPropietarioNombre(propietario: string | { nombre: string; [key: string]: any }): string {
+    if (typeof propietario === 'string') {
+      return propietario;
+    }
+    return propietario?.nombre || 'N/A';
   }
 
   formatDate(date: string | Date | undefined): string {
