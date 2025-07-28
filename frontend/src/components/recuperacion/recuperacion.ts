@@ -20,7 +20,7 @@ export class Recuperacion {
   emailValidado = '';
 
   constructor(
-    private fb: FormBuilder, 
+    private fb: FormBuilder,
     private router: Router,
     private cdr: ChangeDetectorRef
   ) {
@@ -38,7 +38,7 @@ export class Recuperacion {
   passwordMatchValidator(form: FormGroup) {
     const password = form.get('nuevaContrasena');
     const confirmPassword = form.get('confirmarContrasena');
-    
+
     if (password && confirmPassword && password.value !== confirmPassword.value) {
       return { passwordMismatch: true };
     }
@@ -58,27 +58,27 @@ export class Recuperacion {
     this.successMsg = '';
     const email = this.emailForm.get('email')?.value;
     console.log('📧 Email a validar:', email);
-    
+
     console.log('🌐 Iniciando fetch request...');
-    
+
     // Crear un timeout de 5 segundos para la prueba
     const timeoutPromise = new Promise((_, reject) =>
       setTimeout(() => reject(new Error('Timeout: La petición tardó más de 5 segundos')), 5000)
     );
-    
+
     // Primero probemos el endpoint simple
     const fetchPromise = fetch('http://localhost:3000/api/test', {
       method: 'GET'
     });
-    
+
     Promise.race([fetchPromise, timeoutPromise])
     .then((response: any) => {
       console.log('📡 Test response recibido:', response);
       console.log('📡 Test response status:', response.status);
-      
+
       if (response.ok) {
         console.log('✅ Servidor responde correctamente, probando validación de email...');
-        
+
         // Ahora probemos la validación de email
         return this.probarValidacionEmail(email);
       } else {
@@ -88,13 +88,13 @@ export class Recuperacion {
     .catch(error => {
       console.error('❌ Error en test:', error);
       this.loading = false;
-      
+
       if (error.message.includes('Timeout')) {
         this.errorMsg = 'El servidor no responde. Verifica que esté funcionando.';
       } else {
         this.errorMsg = `Error de conexión: ${error.message}`;
       }
-      
+
       this.cdr.detectChanges();
     });
   }
@@ -102,11 +102,11 @@ export class Recuperacion {
   // Método auxiliar para probar la validación de email
   probarValidacionEmail(email: string) {
     console.log('🔍 Probando validación de email...');
-    
+
     const timeoutPromise = new Promise((_, reject) =>
       setTimeout(() => reject(new Error('Timeout en validación: La base de datos está lenta')), 15000)
     );
-    
+
     const fetchPromise = fetch('http://localhost:3000/api/validar-email', {
       method: 'POST',
       headers: {
@@ -114,22 +114,22 @@ export class Recuperacion {
       },
       body: JSON.stringify({ email })
     });
-    
+
     return Promise.race([fetchPromise, timeoutPromise])
     .then((response: any) => {
       console.log('📡 Validación response:', response);
       console.log('📡 Validación status:', response.status);
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       return response.json();
     })
     .then(data => {
       console.log('📋 Validación data:', data);
       console.log('✅ Email válido, cambiando a paso password');
-      
+
       this.loading = false;
       this.emailValidado = email;
       this.currentStep = 'password';
@@ -140,13 +140,13 @@ export class Recuperacion {
     .catch(error => {
       console.error('❌ Error en validación de email:', error);
       this.loading = false;
-      
+
       if (error.message.includes('Timeout')) {
         this.errorMsg = 'La base de datos está tardando mucho en responder. Intenta más tarde.';
       } else {
         this.errorMsg = `Error: ${error.message}`;
       }
-      
+
       this.cdr.detectChanges();
     });
   }
@@ -174,9 +174,9 @@ export class Recuperacion {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
-          email: this.emailValidado, 
-          nuevaContrasena 
+        body: JSON.stringify({
+          email: this.emailValidado,
+          nuevaContrasena
         })
       });
 
@@ -188,7 +188,7 @@ export class Recuperacion {
         this.loading = false;
         this.successMsg = '🎉 ¡Contraseña actualizada exitosamente!';
         this.cdr.detectChanges();
-        
+
         // Redirigir al login después de 2 segundos
         setTimeout(() => {
           this.volverAlLogin();

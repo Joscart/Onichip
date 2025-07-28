@@ -50,11 +50,11 @@ export interface Geofence {
 })
 export class GpsService {
   private apiUrl = 'http://localhost:3000/api';
-  
+
   // Estado reactivo de ubicaciones
   private currentLocationsSubject = new BehaviorSubject<LocationData[]>([]);
   public currentLocations$ = this.currentLocationsSubject.asObservable();
-  
+
   // Estado reactivo de geofences
   private geofencesSubject = new BehaviorSubject<Geofence[]>([]);
   public geofences$ = this.geofencesSubject.asObservable();
@@ -71,7 +71,7 @@ export class GpsService {
     if (options.startDate) params.set('startDate', options.startDate);
     if (options.endDate) params.set('endDate', options.endDate);
     if (options.limit) params.set('limit', options.limit.toString());
-    
+
     const url = `${this.apiUrl}/gps/mascota/${mascotaId}/locations?${params.toString()}`;
     return this.http.get<any>(url);
   }
@@ -98,7 +98,7 @@ export class GpsService {
   }
 
   // 🗺️ GESTIÓN DE GEOFENCES
-  
+
   // Crear geofence
   createGeofence(geofenceData: {
     mascotaId: string;
