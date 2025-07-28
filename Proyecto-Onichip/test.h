@@ -3,8 +3,8 @@
 // Puedes eliminarlo fácilmente quitando esta sección.
 #ifdef TEST_WIFI
 #include <WiFi.h>
-const char* ssid = "AndroidAP";
-const char* password = "12345678";
+const char* ssid = "TP-Link_03F4";
+const char* password = "46315083";
 void connectTestWiFi() {
   Serial.println("Conectando a WiFi...");
   WiFi.begin(ssid, password);

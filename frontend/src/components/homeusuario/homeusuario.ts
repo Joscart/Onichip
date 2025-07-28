@@ -20,20 +20,20 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
   user: any = null;
   successMsg = '';
   errorMsg = '';
-  
+
   // Estados del mapa
   showMapModal = false;
   selectedMascota: any = null;
   mapLoading = false;
   mapError = false;
   mapUpdateInterval: any = null; // Cambiado a público
-  
+
   // Referencias del mapa
   @ViewChild('mapContainer', { static: false }) mapContainer!: ElementRef;
   private map: L.Map | null = null;
   private petMarker: L.Marker | null = null;
   private accuracyCircle: L.Circle | null = null;
-  
+
   private destroy$ = new Subject<void>();
   private maxRetries = 3;
   private currentRetry = 0;
@@ -54,7 +54,7 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
 
     // Cargar datos de mascotas con información GPS
     this.fetchMascotasOptimized();
-    
+
     // Configurar actualización automática cada 30 segundos
     this.setupAutoRefresh();
   }
@@ -66,12 +66,12 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
   ngOnDestroy() {
     this.destroy$.next();
     this.destroy$.complete();
-    
+
     // Limpiar intervals
     if (this.mapUpdateInterval) {
       clearInterval(this.mapUpdateInterval);
     }
-    
+
     // Limpiar el mapa si existe
     if (this.map) {
       this.map.remove();
@@ -82,7 +82,7 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
   setupAutoRefresh() {
     setInterval(() => {
       this.refreshLocationData();
-      
+
       // Si el modal del mapa está abierto, actualizar el mapa también
       if (this.showMapModal && this.selectedMascota) {
         this.updateMapLocation();
@@ -97,7 +97,7 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
       if (mascota._id) {
         // Guardar ubicación anterior para detectar cambios
         const oldLocation = mascota.ubicacionActual ? { ...mascota.ubicacionActual } : null;
-        
+
         // Simular datos GPS aleatorios para demo
         mascota.ubicacionActual = {
           latitude: 19.4326 + (Math.random() - 0.5) * 0.01,
@@ -107,16 +107,16 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
           method: Math.random() > 0.7 ? 'WiFi' : 'GPS',
           timestamp: new Date().toISOString()
         };
-        
+
         // Si el mapa está abierto y es la mascota seleccionada, actualizar el mapa
-        if (this.showMapModal && this.selectedMascota && 
+        if (this.showMapModal && this.selectedMascota &&
             this.selectedMascota._id === mascota._id) {
-          
+
           // Verificar si la ubicación cambió significativamente
           if (oldLocation) {
             const latDiff = Math.abs(mascota.ubicacionActual.latitude - oldLocation.latitude);
             const lngDiff = Math.abs(mascota.ubicacionActual.longitude - oldLocation.longitude);
-            
+
             if (latDiff > 0.000001 || lngDiff > 0.000001) { // Cambio mínimo detectable
               console.log('📍 Nueva ubicación detectada, actualizando mapa...');
               this.selectedMascota.ubicacionActual = mascota.ubicacionActual;
@@ -128,7 +128,7 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
             setTimeout(() => this.updateMapLocation(), 100);
           }
         }
-        
+
         if (!mascota.dispositivo) {
           mascota.dispositivo = {};
         }
@@ -138,7 +138,7 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
         };
       }
     });
-    
+
     // Forzar detección de cambios después de actualizar todas las mascotas
     this.cdr.detectChanges();
     console.log('🔄 Datos de ubicación actualizados para', this.mascotas.length, 'mascotas');
@@ -212,11 +212,11 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
   // Obtener estado de la ubicación
   getLocationStatus(mascota: any): string {
     if (!mascota.ubicacionActual) return 'offline';
-    
+
     const lastUpdate = new Date(mascota.ubicacionActual.timestamp);
     const now = new Date();
     const diffMinutes = (now.getTime() - lastUpdate.getTime()) / (1000 * 60);
-    
+
     if (diffMinutes < 5) return 'online';
     if (diffMinutes < 30) return 'warning';
     return 'offline';
@@ -238,11 +238,11 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
     if (!mascota.ubicacionActual?.timestamp) {
       return 'Sin datos';
     }
-    
+
     const lastUpdate = new Date(mascota.ubicacionActual.timestamp);
     const now = new Date();
     const diffMinutes = (now.getTime() - lastUpdate.getTime()) / (1000 * 60);
-    
+
     if (diffMinutes < 1) return 'Ahora mismo';
     if (diffMinutes < 60) return `Hace ${Math.floor(diffMinutes)} min`;
     if (diffMinutes < 1440) return `Hace ${Math.floor(diffMinutes / 60)} h`;
@@ -255,10 +255,10 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
     this.selectedMascota = mascota;
     this.showMapModal = true;
     this.mapError = false;
-    
+
     // Configurar actualización más frecuente para el mapa (cada 10 segundos)
     this.setupMapAutoUpdate();
-    
+
     // Inicializar el mapa después de que el modal se abra
     setTimeout(() => {
       this.initializeMap();
@@ -268,13 +268,13 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
   closeMapModal() {
     this.showMapModal = false;
     this.selectedMascota = null;
-    
+
     // Limpiar actualización frecuente del mapa
     if (this.mapUpdateInterval) {
       clearInterval(this.mapUpdateInterval);
       this.mapUpdateInterval = null;
     }
-    
+
     // Limpiar el mapa
     if (this.map) {
       this.map.remove();
@@ -304,7 +304,7 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
     if (this.mapUpdateInterval) {
       clearInterval(this.mapUpdateInterval);
     }
-    
+
     // Actualizar cada 10 segundos cuando el mapa esté abierto
     this.mapUpdateInterval = setInterval(() => {
       if (this.showMapModal && this.selectedMascota) {
@@ -317,10 +317,10 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
   // 🔄 ACTUALIZAR UBICACIÓN DE UNA MASCOTA ESPECÍFICA
   refreshSingleMascotaLocation(mascota: any) {
     if (!mascota) return;
-    
+
     // Guardar ubicación anterior
     const oldLocation = mascota.ubicacionActual ? { ...mascota.ubicacionActual } : null;
-    
+
     // Simular nueva ubicación GPS (reemplazar con llamada real al API)
     const newLocation = {
       latitude: 19.4326 + (Math.random() - 0.5) * 0.01,
@@ -330,15 +330,15 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
       method: Math.random() > 0.7 ? 'WiFi' : 'GPS',
       timestamp: new Date().toISOString()
     };
-    
+
     // Actualizar la ubicación
     mascota.ubicacionActual = newLocation;
-    
+
     // Si hay cambio significativo, actualizar el mapa
     if (oldLocation) {
       const latDiff = Math.abs(newLocation.latitude - oldLocation.latitude);
       const lngDiff = Math.abs(newLocation.longitude - oldLocation.longitude);
-      
+
       if (latDiff > 0.000001 || lngDiff > 0.000001) {
         console.log('📍 Ubicación actualizada:', newLocation);
         this.updateMapLocation();
@@ -348,7 +348,7 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
       console.log('📍 Primera ubicación obtenida:', newLocation);
       this.updateMapLocation();
     }
-    
+
     this.cdr.detectChanges();
   }
 
@@ -440,7 +440,7 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
 
     // Simular actualización de ubicación (reemplazar con llamada real al API)
     this.simulateLocationUpdate();
-    
+
     // Actualizar el mapa con los nuevos datos
     this.updateMapLocation();
   }
@@ -460,7 +460,7 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
         // Animar el movimiento del marcador
         const currentLatLng = this.petMarker.getLatLng();
         const newLatLng = L.latLng(lat, lng);
-        
+
         // Solo animar si la distancia es significativa pero no muy grande
         const distance = currentLatLng.distanceTo(newLatLng);
         if (distance > 1 && distance < 1000) { // Entre 1m y 1km
@@ -468,10 +468,10 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
         } else {
           this.petMarker.setLatLng([lat, lng]);
         }
-        
+
         // Actualizar el contenido del popup
         this.petMarker.setPopupContent(this.createPetPopupContent(this.selectedMascota));
-        
+
         // Actualizar el icono si el estado cambió
         const newIcon = L.divIcon({
           html: this.getPetMapIcon(this.selectedMascota),
@@ -487,7 +487,7 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
       if (this.accuracyCircle) {
         this.accuracyCircle.setLatLng([lat, lng]);
         this.accuracyCircle.setRadius(accuracy);
-        
+
         // Cambiar color del círculo basado en la precisión
         const color = accuracy < 10 ? '#28a745' : accuracy < 20 ? '#ffc107' : '#dc3545';
         this.accuracyCircle.setStyle({ color: color, fillColor: color });
@@ -523,9 +523,9 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
         currentStep++;
         const newLat = fromLatLng.lat + (stepLat * currentStep);
         const newLng = fromLatLng.lng + (stepLng * currentStep);
-        
+
         this.petMarker.setLatLng([newLat, newLng]);
-        
+
         setTimeout(animateStep, 50); // 50ms entre pasos = 1s total
       }
     };
@@ -537,7 +537,7 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
   getPetMapIcon(mascota: any): string {
     const petEmoji = mascota.tipo === 'Perro' ? '🐕' : '🐱';
     const statusColor = this.getLocationStatusColor(mascota);
-    
+
     return `
       <div class="pet-map-icon" style="background-color: ${statusColor}">
         <span class="pet-emoji">${petEmoji}</span>
@@ -560,7 +560,7 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
   createPetPopupContent(mascota: any): string {
     const location = mascota.ubicacionActual;
     const lastUpdate = this.getLastLocationUpdate(mascota);
-    
+
     return `
       <div class="pet-popup">
         <h4>${mascota.nombre}</h4>
@@ -581,14 +581,14 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
     if (!this.selectedMascota?.ubicacionActual) return;
 
     const location = this.selectedMascota.ubicacionActual;
-    
+
     // Pequeña variación en la ubicación para simular movimiento
     location.latitude += (Math.random() - 0.5) * 0.0001;
     location.longitude += (Math.random() - 0.5) * 0.0001;
     location.accuracy = Math.floor(Math.random() * 15) + 5;
     location.speed = Math.floor(Math.random() * 10);
     location.timestamp = new Date().toISOString();
-    
+
     console.log('🔄 Ubicación actualizada:', location);
   }
 
@@ -617,40 +617,40 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
   asociarDispositivo(mascota: any) {
     const nuevoDeviceId = prompt('Ingrese el nuevo ID del dispositivo GPS:', mascota.dispositivo?.id || '');
     if (nuevoDeviceId === null) return;
-    
+
     // Validar que no esté vacío
     if (!nuevoDeviceId || nuevoDeviceId.trim() === '') {
       this.errorMsg = 'El ID del dispositivo no puede estar vacío.';
       setTimeout(() => this.errorMsg = '', 3000);
       return;
     }
-    
+
     // Usar el deviceId actual de la mascota para buscarla en el backend
     const currentDeviceId = mascota.deviceId || mascota.dispositivo?.id;
-    
+
     if (!currentDeviceId) {
       this.errorMsg = 'Error: No se encontró el ID actual del dispositivo.';
       setTimeout(() => this.errorMsg = '', 3000);
       return;
     }
-    
+
     // Validar que el nuevo ID sea diferente al actual
     if (nuevoDeviceId.trim() === currentDeviceId) {
       this.errorMsg = 'El nuevo ID debe ser diferente al actual.';
       setTimeout(() => this.errorMsg = '', 3000);
       return;
     }
-    
-    const body = { 
+
+    const body = {
       deviceId: nuevoDeviceId.trim(),
-      'dispositivo.id': nuevoDeviceId.trim() 
+      'dispositivo.id': nuevoDeviceId.trim()
     };
     this.loading = true;
     this.errorMsg = ''; // Limpiar errores previos
-    
+
     console.log('🔄 Actualizando dispositivo:', currentDeviceId, '->', nuevoDeviceId);
     console.log('📝 Datos a enviar:', body);
-    
+
     this.mascotasService.updateDeviceId(currentDeviceId, body).subscribe({
       next: () => {
         if (!mascota.dispositivo) mascota.dispositivo = {};
@@ -663,14 +663,14 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
       error: (err) => {
         console.error('❌ Error al actualizar dispositivo:', err);
         this.loading = false;
-        
+
         // Manejo específico para deviceId duplicado
         if (err.error?.error === 'DUPLICATE_DEVICE_ID') {
           this.errorMsg = `El ID "${nuevoDeviceId}" ya está en uso. Por favor, elija un ID diferente.`;
         } else {
           this.errorMsg = err.error?.message || 'Error al asociar el dispositivo GPS.';
         }
-        
+
         // Limpiar el mensaje de error después de 5 segundos
         setTimeout(() => {
           this.errorMsg = '';
@@ -690,7 +690,7 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
   }
 
   // ===== MÉTODOS PARA NAVBAR =====
-  
+
   // Manejar logout desde navbar
   onLogout() {
     localStorage.removeItem('user');

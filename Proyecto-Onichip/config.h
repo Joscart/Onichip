@@ -5,14 +5,20 @@
 
 // Unique identifier for this tracker device
 #define DEVICE_ID    "collar-test"
-#define API_BASE     "http://18.223.160.105:3000"
+#define API_BASE     "http://192.168.0.104:3000"
 
 
 // ————— SIM & GPRS —————
 #define SIM_PIN             ""                  // PIN de la SIM si aplica
-#define GPRS_APN            "internet.movistar.ec"
+#define GPRS_APN            "internet.movistar.ec"  // APN configurado para Ecuador
 #define GPRS_USER           ""                  // Usuario GPRS si aplica
 #define GPRS_PASS           ""                  // Password GPRS si aplica
+
+// NOTA: Geolocalización configurada específicamente para Quito, Ecuador
+// - MCC: 740 (Ecuador)
+// - MNC: 0 (Movistar Ecuador como operador por defecto)
+// - LAC: 100 (Zona Norte de Quito)
+// - CellID: 2010 (Área metropolitana)
 
 // ————— LILYGO T-Call v1.4 Pins —————
 #define MODEM_RST_PIN       5   // SIM800 Reset

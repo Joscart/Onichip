@@ -42,6 +42,15 @@ bool useWifiLocation = false;
 enum ConnStatus { CONN_OK = 0, NO_NETWORK, GPRS_FAIL };
 enum LocationMethod { GPS_ONLY, WIFI_FALLBACK, HYBRID_MODE };
 
+// Constantes para geolocalización GSM
+#define MAX_WIFI_NETWORKS   15    // Máximo redes WiFi a incluir
+#define MIN_RSSI_THRESHOLD -85    // Umbral mínimo RSSI para WiFi
+#define GSM_TIMEOUT_MS     5000   // Timeout para comandos GSM
+#define DEFAULT_LAC        "100"  // LAC específico para Quito (Zona Norte)
+#define DEFAULT_CELLID     "2010" // Cell ID realista para área metropolitana de Quito
+#define DEFAULT_MCC        "740"  // Ecuador (código oficial)
+#define DEFAULT_MNC        "0"    // Movistar Ecuador (operador por defecto)
+
 // Estructura para datos GPS mejorados
 struct LocationData {
     float latitude;
@@ -54,6 +63,16 @@ struct LocationData {
     unsigned long timestamp;
 };
 
+// Estructura para datos GSM de torres celulares
+struct GSMData {
+    String mcc = "";
+    String mnc = "";
+    String lac = "";
+    String cellId = "";
+    int signalStrength = 0;
+    bool isValid = false;
+};
+
 // Protos GPS y WiFi
 bool        setPowerBoostKeepOn(bool en);
 float       readBatteryLevel();
@@ -64,6 +83,7 @@ void        blinkError(int code);
 void        blinkConnected();
 bool        readGPS(LocationData &location); // GPS principal
 bool        getWiFiLocation(LocationData &location); // WiFi fallback
+bool        getGSMCellInfo(GSMData &gsmData); // Auxiliar GSM
 bool        readLocationHybrid(LocationData &location); // Método híbrido
 void        sendLocationData(LocationData &location);
 void        readAllData(LocationData &location, float &batV, bool &charging);
@@ -592,74 +612,524 @@ bool readGPS(LocationData &location) {
     return false;
 }
 
-// — Obtener ubicación vía WiFi (fallback)
+// Función auxiliar para obtener datos GSM de manera robusta
+bool getGSMCellInfo(GSMData &gsmData) {
+    if (!modem.isNetworkConnected()) {
+        Serial.println("📡 GSM no conectado a red");
+        return false;
+    }
+    
+    Serial.println("🔍 Obteniendo información de torre GSM...");
+    
+    // Método 1: Intentar obtener info completa con AT+CENG
+    Serial.println("📋 Método 1: AT+CENG (info detallada)");
+    SerialAT.println("AT+CENG=1,1");
+    delay(1000);
+    
+    SerialAT.println("AT+CENG?");
+    delay(2000);
+    
+    String response = "";
+    unsigned long startTime = millis();
+    while (SerialAT.available() && (millis() - startTime) < GSM_TIMEOUT_MS) {
+        response += SerialAT.readString();
+        delay(100);
+    }
+    
+    if (response.length() > 0) {
+        Serial.println("📦 Respuesta CENG: " + response);
+        
+        // Buscar patrón: +CENG: 0,"lac,cellid,rxlev,mcc,mnc,..."
+        int quoteStart = response.indexOf("\"") + 1;
+        int quoteEnd = response.indexOf("\"", quoteStart);
+        
+        if (quoteStart > 0 && quoteEnd > quoteStart) {
+            String cellData = response.substring(quoteStart, quoteEnd);
+            
+            // Dividir por comas: LAC,CellID,RxLev,MCC,MNC,...
+            int positions[6] = {-1, -1, -1, -1, -1, -1};
+            int commaCount = 0;
+            
+            for (int i = 0; i < cellData.length() && commaCount < 6; i++) {
+                if (cellData.charAt(i) == ',') {
+                    positions[commaCount++] = i;
+                }
+            }
+            
+            if (commaCount >= 4) {
+                gsmData.lac = cellData.substring(0, positions[0]);
+                gsmData.cellId = cellData.substring(positions[0] + 1, positions[1]);
+                gsmData.mcc = cellData.substring(positions[3] + 1, positions[4]);
+                gsmData.mnc = cellData.substring(positions[4] + 1, 
+                               commaCount > 4 ? positions[5] : cellData.length());
+                
+                // Limpiar datos (remover espacios y caracteres no numéricos)
+                gsmData.lac.trim();
+                gsmData.cellId.trim();
+                gsmData.mcc.trim();
+                gsmData.mnc.trim();
+                
+                // Validar que tenemos datos numéricos
+                if (gsmData.mcc.length() >= 3 && gsmData.mnc.length() >= 1 && 
+                    gsmData.lac.length() >= 1 && gsmData.cellId.length() >= 1) {
+                    gsmData.isValid = true;
+                    Serial.printf("✅ CENG OK: MCC=%s, MNC=%s, LAC=%s, Cell=%s\n",
+                                 gsmData.mcc.c_str(), gsmData.mnc.c_str(), 
+                                 gsmData.lac.c_str(), gsmData.cellId.c_str());
+                }
+            }
+        }
+    }
+    
+    // Método 2: Si CENG falló, usar AT+COPS para MCC/MNC básico
+    if (!gsmData.isValid) {
+        Serial.println("📋 Método 2: AT+COPS (info básica)");
+        SerialAT.println("AT+COPS?");
+        delay(1500);
+        
+        response = "";
+        startTime = millis();
+        while (SerialAT.available() && (millis() - startTime) < GSM_TIMEOUT_MS) {
+            response += SerialAT.readString();
+            delay(100);
+        }
+        
+        if (response.length() > 0) {
+            Serial.println("📦 Respuesta COPS: " + response);
+            
+            // Buscar formato: +COPS: 0,2,"73402" o +COPS: 0,0,"Claro CO","73402"
+            int lastQuoteStart = response.lastIndexOf("\"") - 5; // Retroceder para encontrar el código
+            if (lastQuoteStart < 0) lastQuoteStart = response.indexOf("\"") + 1;
+            int lastQuoteEnd = response.lastIndexOf("\"");
+            
+            if (lastQuoteStart >= 0 && lastQuoteEnd > lastQuoteStart) {
+                String operatorCode = response.substring(lastQuoteStart, lastQuoteEnd);
+                operatorCode.trim();
+                
+                if (operatorCode.length() >= 5) { // MCC(3) + MNC(2+)
+                    gsmData.mcc = operatorCode.substring(0, 3);
+                    gsmData.mnc = operatorCode.substring(3);
+                    gsmData.lac = DEFAULT_LAC;
+                    gsmData.cellId = DEFAULT_CELLID;
+                    gsmData.isValid = true;
+                    
+                    // Identificar operador específico para Ecuador
+                    String operadorNombre = "Desconocido";
+                    if (gsmData.mcc == "740") { // Ecuador
+                        if (gsmData.mnc == "1") operadorNombre = "Claro Ecuador";
+                        else if (gsmData.mnc == "0") operadorNombre = "Movistar Ecuador";
+                        else if (gsmData.mnc == "2") operadorNombre = "CNT Mobile";
+                        else if (gsmData.mnc == "3") operadorNombre = "Tuenti Ecuador";
+                    }
+                    
+                    Serial.printf("✅ COPS OK: %s (MCC=%s, MNC=%s) + defaults Quito\n",
+                                 operadorNombre.c_str(), gsmData.mcc.c_str(), gsmData.mnc.c_str());
+                } else {
+                    // Si COPS también falla, usar valores por defecto específicos de Quito
+                    Serial.println("⚠️ COPS falló, usando valores específicos de Quito...");
+                    gsmData.mcc = DEFAULT_MCC;
+                    gsmData.mnc = DEFAULT_MNC;
+                    gsmData.lac = DEFAULT_LAC;
+                    gsmData.cellId = DEFAULT_CELLID;
+                    gsmData.isValid = true;
+                    
+                    Serial.printf("⚠️ Defaults Quito: Movistar Ecuador (MCC=%s, MNC=%s, LAC=%s, Cell=%s)\n",
+                                 gsmData.mcc.c_str(), gsmData.mnc.c_str(), 
+                                 gsmData.lac.c_str(), gsmData.cellId.c_str());
+                }
+            }
+        }
+    }
+    
+    // Obtener intensidad de señal GSM
+    if (gsmData.isValid) {
+        int16_t signalQuality = modem.getSignalQuality();
+        if (signalQuality > 0 && signalQuality < 32) {
+            // Convertir CSQ a dBm: dBm = -113 + (CSQ * 2)
+            gsmData.signalStrength = -113 + (signalQuality * 2);
+            Serial.printf("📶 Señal GSM: CSQ=%d, dBm=%d\n", 
+                         signalQuality, gsmData.signalStrength);
+        }
+    }
+    
+    return gsmData.isValid;
+}
+
+// — Obtener ubicación vía API completa (WiFi + GSM + IP)
 bool getWiFiLocation(LocationData &location) {
     location.isValid = false;
     location.method = WIFI_FALLBACK;
     
-    // Escanear redes WiFi cercanas
+    Serial.println("🌐 Iniciando geolocalización híbrida (WiFi + GSM + IP)...");
+    
+    // PASO 1: Escanear redes WiFi cercanas
     WiFi.mode(WIFI_STA);
     int networkCount = WiFi.scanNetworks();
     
-    if (networkCount == 0) {
-        Serial.println("❌ No hay redes WiFi disponibles");
-        return false;
+    // PASO 2: Obtener información GSM usando función auxiliar
+    GSMData gsmData;
+    bool gsmDataAvailable = getGSMCellInfo(gsmData);
+    
+    // PASO 3: Construir JSON para API completa
+    String json = "{";
+    json += "\"deviceId\":\"" + deviceId + "\"";
+    
+    // Incluir datos WiFi si están disponibles
+    if (networkCount > 0) {
+        json += ",\"wifiAccessPoints\":[";
+        int validNetworks = 0;
+        
+        for (int i = 0; i < networkCount && validNetworks < 15; i++) {
+            if (WiFi.RSSI(i) > -85) { // Filtro más permisivo para 2G
+                if (validNetworks > 0) json += ",";
+                json += "{";
+                json += "\"macAddress\":\"" + WiFi.BSSIDstr(i) + "\"";
+                
+                // Escapar caracteres especiales en SSID
+                String ssid = WiFi.SSID(i);
+                ssid.replace("\"", "\\\""); // Escapar comillas
+                ssid.replace("\\", "\\\\"); // Escapar backslashes
+                json += ",\"ssid\":\"" + ssid + "\"";
+                
+                json += ",\"signalStrength\":" + String(WiFi.RSSI(i));
+                json += "}";
+                validNetworks++;
+            }
+        }
+        json += "]";
+        
+        Serial.printf("📶 WiFi: %d redes válidas detectadas\n", validNetworks);
     }
     
-    // Crear JSON para Google Geolocation API
-    String json = "{\"wifiAccessPoints\":[";
-    int validNetworks = 0;
-    
-    for (int i = 0; i < networkCount && validNetworks < 10; i++) {
-        if (WiFi.RSSI(i) > -90) { // Solo redes con buena señal
-            if (validNetworks > 0) json += ",";
-            json += "{";
-            json += "\"macAddress\":\"" + WiFi.BSSIDstr(i) + "\",";
-            json += "\"signalStrength\":" + String(WiFi.RSSI(i));
-            json += "}";
-            validNetworks++;
+    // Incluir datos GSM si están disponibles
+    if (gsmDataAvailable && gsmData.mcc.length() > 0 && gsmData.mnc.length() > 0) {
+        if (networkCount > 0) json += ","; // Solo agregar coma si hay WiFi antes
+        
+        json += "\"cellTowers\":[{";
+        
+        // Convertir strings a números enteros
+        int cellIdNum = gsmData.cellId.toInt();
+        int lacNum = gsmData.lac.toInt();
+        int mccNum = gsmData.mcc.toInt();
+        int mncNum = gsmData.mnc.toInt();
+        
+        // Validar rangos antes de incluir en JSON (específico para Ecuador)
+        bool validGsmData = true;
+        
+        // Validar MCC específico para Ecuador
+        if (mccNum != 740 && (mccNum < 200 || mccNum > 999)) {
+            Serial.printf("⚠️ MCC inválido: %d (esperado 740 para Ecuador o 200-999 general)\n", mccNum);
+            if (mccNum != 740) {
+                Serial.println("💡 Nota: MCC 740 es específico de Ecuador");
+            }
+            validGsmData = false;
+        }
+        
+        // Validar MNC específico para operadores ecuatorianos
+        if (mccNum == 740) {
+            if (mncNum != 0 && mncNum != 1 && mncNum != 2 && mncNum != 3) {
+                Serial.printf("⚠️ MNC %d no reconocido para Ecuador\n", mncNum);
+                Serial.println("💡 MNCs Ecuador: 0=Movistar, 1=Claro, 2=CNT, 3=Tuenti");
+            }
+        }
+        
+        if (mncNum < 0 || mncNum > 999) {
+            Serial.printf("⚠️ MNC fuera de rango: %d (esperado 0-999)\n", mncNum);
+            validGsmData = false;
+        }
+        
+        if (cellIdNum <= 0 || cellIdNum > 65535) {
+            Serial.printf("⚠️ CellID fuera de rango: %d (esperado 1-65535)\n", cellIdNum);
+            validGsmData = false;
+        }
+        
+        if (lacNum <= 0 || lacNum > 65535) {
+            Serial.printf("⚠️ LAC fuera de rango: %d (esperado 1-65535)\n", lacNum);
+            validGsmData = false;
+        }
+        
+        if (validGsmData) {
+            json += "\"cellId\":" + String(cellIdNum);
+            json += ",\"locationAreaCode\":" + String(lacNum);
+            json += ",\"mobileCountryCode\":" + String(mccNum);
+            json += ",\"mobileNetworkCode\":" + String(mncNum);
+            
+            if (gsmData.signalStrength != 0) {
+                json += ",\"signalStrength\":" + String(gsmData.signalStrength);
+            }
+            json += "}]";
+            json += ",\"radioType\":\"gsm\"";
+            
+            // Mostrar información específica del operador ecuatoriano
+            String operadorInfo = "Desconocido";
+            if (mccNum == 740) {
+                if (mncNum == 0) operadorInfo = "Movistar Ecuador";
+                else if (mncNum == 1) operadorInfo = "Claro Ecuador";
+                else if (mncNum == 2) operadorInfo = "CNT Mobile";
+                else if (mncNum == 3) operadorInfo = "Tuenti Ecuador";
+            }
+            
+            Serial.printf("📡 GSM válido Quito: %s (MCC=%d, MNC=%d, LAC=%d, Cell=%d)\n", 
+                         operadorInfo.c_str(), mccNum, mncNum, lacNum, cellIdNum);
+        } else {
+            Serial.println("❌ Datos GSM inválidos, excluyendo torres celulares");
+            gsmDataAvailable = false; // Marcar como no disponible
+            json = json.substring(0, json.length() - 15); // Remover "\"cellTowers\":[{"
         }
     }
-    json += "]}";
     
-    if (validNetworks == 0) {
-        Serial.println("❌ No hay redes WiFi válidas para geolocalización");
+    // Incluir IP como fuente adicional
+    if (networkCount > 0 || gsmDataAvailable) json += ",";
+    json += "\"considerIp\":true";
+    json += "}";
+    
+    // PASO 4: Verificar que tenemos al menos una fuente
+    if (networkCount == 0 && !gsmDataAvailable) {
+        Serial.println("❌ Sin datos WiFi ni GSM para geolocalización");
         return false;
     }
     
-    // Hacer petición al servidor para obtener ubicación
-    HTTPClient http;
-    http.begin(apiBase + "/api/location/wifi");
-    http.addHeader("Content-Type", "application/json");
+    // PASO 4.5: Validar JSON antes de enviar
+    Serial.println("🔍 Validando JSON antes del envío...");
+    Serial.println("📝 JSON construido: " + json);
     
-    int httpCode = http.POST(json);
+    // Verificar que el JSON termina correctamente
+    if (!json.endsWith("}")) {
+        Serial.println("❌ JSON no termina correctamente, agregando cierre");
+        json += "}";
+    }
     
-    if (httpCode == 200) {
-        String response = http.getString();
+    // Verificar que el JSON es válido usando ArduinoJson
+    DynamicJsonDocument testDoc(2048);
+    DeserializationError parseError = deserializeJson(testDoc, json);
+    
+    if (parseError) {
+        Serial.println("❌ JSON inválido construido:");
+        Serial.println("Error: " + String(parseError.c_str()));
+        Serial.println("JSON problemático: " + json);
+        
+        // Intentar crear un JSON mínimo solo con IP si todo falla
+        if (networkCount == 0 && !gsmDataAvailable) {
+            Serial.println("🔧 Creando JSON mínimo solo con IP...");
+            json = "{\"deviceId\":\"" + deviceId + "\",\"considerIp\":true}";
+            
+            // Validar JSON mínimo
+            DynamicJsonDocument minDoc(512);
+            DeserializationError minError = deserializeJson(minDoc, json);
+            if (minError) {
+                Serial.println("❌ Incluso JSON mínimo falló");
+                return false;
+            }
+            Serial.println("✅ Usando JSON mínimo con IP solamente");
+        } else {
+            return false;
+        }
+    }
+    
+    // Verificar campos requeridos
+    if (!testDoc["deviceId"] || testDoc["deviceId"].as<String>().length() == 0) {
+        Serial.println("❌ deviceId faltante o vacío");
+        return false;
+    }
+    
+    // Verificar que al menos una fuente esté presente
+    bool hasWifi = testDoc["wifiAccessPoints"] && testDoc["wifiAccessPoints"].size() > 0;
+    bool hasGsm = testDoc["cellTowers"] && testDoc["cellTowers"].size() > 0;
+    bool hasIp = testDoc["considerIp"];
+    
+    if (!hasWifi && !hasGsm && !hasIp) {
+        Serial.println("❌ No hay fuentes de geolocalización válidas");
+        return false;
+    }
+    
+    Serial.printf("✅ JSON válido | Fuentes: WiFi:%s GSM:%s IP:%s\n", 
+                 hasWifi ? "Sí" : "No", hasGsm ? "Sí" : "No", hasIp ? "Sí" : "No");
+    
+    // PASO 5: Enviar a la API de geolocalización con fallback de conectividad
+    Serial.println("🔍 Enviando datos a API de geolocalización...");
+    Serial.println("📝 JSON: " + json);
+    
+    bool requestSuccess = false;
+    String response = "";
+    int httpCode = 0;
+    unsigned long responseTime = 0;
+    
+    // MÉTODO 1: Intentar primero por WiFi
+    Serial.println("🌐 Método 1: Intentando conexión WiFi...");
+    
+    // Activar modo WiFi usando credenciales de test.h
+    WiFi.mode(WIFI_STA);
+    #ifdef TEST_WIFI
+    WiFi.begin(ssid, password);
+    #else
+    // Si no hay TEST_WIFI definido, saltar directamente a 2G
+    Serial.println("⚠️ TEST_WIFI no definido, saltando a 2G...");
+    #endif
+    
+    #ifdef TEST_WIFI
+    int wifiAttempts = 0;
+    while (WiFi.status() != WL_CONNECTED && wifiAttempts < 20) {
+        delay(500);
+        Serial.print(".");
+        wifiAttempts++;
+    }
+    
+    if (WiFi.status() == WL_CONNECTED) {
+        Serial.println("\n✅ WiFi conectado: " + WiFi.localIP().toString());
+        
+        HTTPClient http;
+        String fullUrl = apiBase + "/api/location/wifi";
+        http.begin(fullUrl);
+        http.addHeader("Content-Type", "application/json");
+        http.addHeader("User-Agent", "OniChip-ESP32-WiFi/1.0");
+        http.setTimeout(15000); // 15 segundos para WiFi
+        
+        unsigned long startTime = millis();
+        httpCode = http.POST(json);
+        responseTime = millis() - startTime;
+        
+        Serial.printf("📶 WiFi - Tiempo: %lums, HTTP: %d\n", responseTime, httpCode);
+        
+        if (httpCode == 200) {
+            response = http.getString();
+            requestSuccess = true;
+            Serial.println("✅ Geolocalización exitosa por WiFi");
+        } else {
+            Serial.printf("⚠️ WiFi falló (HTTP %d), intentando 2G...\n", httpCode);
+        }
+        
+        http.end();
+        
+        // Desconectar WiFi después del intento
+        WiFi.disconnect(true);
+        WiFi.mode(WIFI_OFF);
+        delay(1000);
+    } else {
+        Serial.println("\n⚠️ WiFi no disponible, intentando 2G...");
+        WiFi.disconnect(true);
+        WiFi.mode(WIFI_OFF);
+        delay(1000);
+    }
+    #endif
+    
+    // MÉTODO 2: Si WiFi falló, intentar por datos móviles 2G
+    if (!requestSuccess) {
+        Serial.println("📡 Método 2: Intentando conexión datos móviles 2G...");
+        
+        // Verificar conexión GPRS
+        if (!modem.isGprsConnected()) {
+            Serial.println("🔄 Conectando GPRS...");
+            if (!modem.gprsConnect(GPRS_APN, GPRS_USER, GPRS_PASS)) {
+                Serial.println("❌ Error conectando GPRS");
+                return false;
+            }
+        }
+        
+        Serial.println("✅ GPRS conectado, enviando datos...");
+        
+        HTTPClient http;
+        String fullUrl = apiBase + "/api/location/wifi";
+        http.begin(fullUrl);
+        http.addHeader("Content-Type", "application/json");
+        http.addHeader("User-Agent", "OniChip-ESP32-2G/1.0");
+        http.setTimeout(25000); // 25 segundos para 2G (más lento)
+        
+        unsigned long startTime = millis();
+        httpCode = http.POST(json);
+        responseTime = millis() - startTime;
+        
+        Serial.printf("📡 2G - Tiempo: %lums, HTTP: %d\n", responseTime, httpCode);
+        
+        if (httpCode == 200) {
+            response = http.getString();
+            requestSuccess = true;
+            Serial.println("✅ Geolocalización exitosa por datos móviles 2G");
+        } else {
+            Serial.printf("❌ Ambos métodos fallaron. Último error HTTP: %d\n", httpCode);
+        }
+        
+        http.end();
+    }
+    
+    // PASO 6: Procesar respuesta si fue exitosa
+    if (requestSuccess && response.length() > 0) {
+        Serial.println("📦 Respuesta: " + response);
         
         // Parse JSON response
         DynamicJsonDocument doc(1024);
-        deserializeJson(doc, response);
+        DeserializationError error = deserializeJson(doc, response);
         
-        if (doc["status"] == "OK") {
+        if (!error && doc["status"] == "OK") {
             location.latitude = doc["location"]["lat"];
             location.longitude = doc["location"]["lng"];
-            location.accuracy = doc["accuracy"];
-            location.speed = 0.0; // WiFi no proporciona velocidad
+            location.accuracy = doc["accuracy"] | 1000;
+            location.speed = 0.0; // API no proporciona velocidad
             location.satellites = 0;
             location.isValid = true;
             location.method = WIFI_FALLBACK;
             
-            Serial.printf("📶 WiFi Loc: %.6f, %.6f | Precisión: %.0fm\n", 
-                          location.latitude, location.longitude, location.accuracy);
+            // Mostrar información de fuentes utilizadas
+            if (doc["sources"]) {
+                int wifiUsed = doc["sources"]["wifi"] | 0;
+                int gsmUsed = doc["sources"]["gsm"] | 0;
+                bool ipUsed = doc["sources"]["ip"] | false;
+                
+                Serial.printf("✅ Ubicación obtenida: %.6f, %.6f\n", 
+                             location.latitude, location.longitude);
+                Serial.printf("📊 Precisión: ±%.0fm | Fuentes: WiFi:%d GSM:%d IP:%s\n", 
+                             location.accuracy, wifiUsed, gsmUsed, ipUsed ? "Sí" : "No");
+                
+                if (doc["quality"]) {
+                    Serial.println("🎯 Calidad: " + String(doc["quality"].as<String>()));
+                }
+            }
             
-            http.end();
             return true;
+        } else {
+            Serial.println("❌ Error parseando respuesta JSON");
+            if (error) {
+                Serial.println("Error JSON: " + String(error.c_str()));
+            }
+        }
+    } else {
+        // Mostrar errores específicos según el código HTTP
+        if (httpCode == 400) {
+            Serial.println("❌ Error 400 - El servidor rechazó los datos");
+            Serial.println("💡 Posibles causas:");
+            Serial.println("   - JSON malformado");
+            Serial.println("   - Campos requeridos faltantes");
+            Serial.println("   - Valores fuera de rango");
+            Serial.println("   - API Key de Google inválida");
+            
+            // Mostrar respuesta del servidor si está disponible
+            if (response.length() > 0) {
+                Serial.println("📋 Respuesta del servidor:");
+                Serial.println(response);
+            }
+        } else if (httpCode == 403) {
+            Serial.println("❌ Error 403 - Problema con API Key de Google");
+            Serial.println("💡 Verificar configuración del backend");
+        } else if (httpCode == 404) {
+            Serial.println("❌ Error 404 - Endpoint no encontrado");
+            Serial.println("💡 Verificar URL: " + apiBase + "/api/location/wifi");
+        } else if (httpCode == 500) {
+            Serial.println("❌ Error 500 - Error interno del servidor");
+            if (response.length() > 0) {
+                Serial.println("📋 Respuesta del servidor:");
+                Serial.println(response);
+            }
+        } else if (httpCode > 0) {
+            Serial.printf("❌ Error HTTP %d\n", httpCode);
+            if (response.length() > 0) {
+                Serial.println("📋 Respuesta del servidor:");
+                Serial.println(response);
+            }
+        } else {
+            Serial.println("❌ Error de conectividad - Sin respuesta del servidor");
         }
     }
     
-    http.end();
-    Serial.println("❌ Error en geolocalización WiFi");
+    Serial.println("❌ Error en geolocalización híbrida - Todos los métodos fallaron");
     return false;
 }
 

@@ -58,11 +58,11 @@ export class Registromascota {
     this.loading = true;
     this.errorMsg = '';
     this.successMsg = '';
-    
+
     // Generar deviceId único si no se proporciona
     const formValue = this.mascotaForm.value;
     const deviceId = formValue.deviceId || `ONICHIP-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
-    
+
     const mascota: any = {
       ...formValue,
       propietario: userId,
@@ -73,7 +73,7 @@ export class Registromascota {
         version: '1.0'
       }
     };
-    
+
     console.log('📝 Registrando mascota:', mascota);
 
     this.http.post<any>('http://localhost:3000/api/device', mascota).subscribe({
