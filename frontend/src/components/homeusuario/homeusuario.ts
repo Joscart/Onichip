@@ -136,11 +136,11 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
           nivel: Math.floor(Math.random() * 100) + 1,
           cargando: Math.random() > 0.8
         };
-        
-        this.cdr.detectChanges();
       }
     });
     
+    // Forzar detección de cambios después de actualizar todas las mascotas
+    this.cdr.detectChanges();
     console.log('🔄 Datos de ubicación actualizados para', this.mascotas.length, 'mascotas');
   }
 

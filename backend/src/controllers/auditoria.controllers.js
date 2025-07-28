@@ -788,4 +788,150 @@ auditoriaController.limpiarRegistrosAntiguos = async (req, res) => {
     }
 };
 
+/**
+ * 📊 Obtener métricas del dashboard
+ * 
+ * @description Obtiene estadísticas resumidas para el dashboard de administración
+ * @route GET /api/admin/reportes/dashboard-metrics
+ * @access Admin only
+ * 
+ * @output {Object} 200 - Métricas del dashboard
+ * @output {Object} response.resumen - Estadísticas resumidas
+ * @output {Object} response.graficos - Datos para gráficos
+ * @output {Object} 500 - Error interno del servidor
+ */
+auditoriaController.obtenerMetricasDashboard = async (req, res) => {
+    try {
+        console.log('📊 Obteniendo métricas del dashboard...');
+
+        const now = new Date();
+        const hace30Dias = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
+        const hace24Horas = new Date(now.getTime() - (24 * 60 * 60 * 1000));
+
+        // Obtener estadísticas generales en paralelo
+        const [
+            totalUsuarios,
+            usuariosNuevos30d,
+            totalMascotas,
+            mascotasNuevas30d,
+            alertas24h,
+            mascotasPorEspecie,
+            alertasPorTipo
+        ] = await Promise.all([
+            // Total usuarios
+            Usuario.countDocuments(),
+            
+            // Usuarios nuevos últimos 30 días
+            Usuario.countDocuments({ 
+                $or: [
+                    { createdAt: { $gte: hace30Dias } },
+                    { fechaRegistro: { $gte: hace30Dias } }
+                ]
+            }),
+            
+            // Total mascotas
+            Mascota.countDocuments(),
+            
+            // Mascotas nuevas últimos 30 días
+            Mascota.countDocuments({ 
+                createdAt: { $gte: hace30Dias }
+            }),
+            
+            // Alertas últimas 24 horas
+            Auditoria.countDocuments({
+                timestamp: { $gte: hace24Horas },
+                severidad: { $in: ['warning', 'error', 'critical'] }
+            }),
+            
+            // Mascotas por especie
+            Mascota.aggregate([
+                {
+                    $group: {
+                        _id: { $toLower: '$especie' },
+                        count: { $sum: 1 }
+                    }
+                },
+                {
+                    $project: {
+                        _id: 1,
+                        count: 1,
+                        total: '$count'
+                    }
+                }
+            ]),
+            
+            // Alertas por tipo
+            Auditoria.aggregate([
+                {
+                    $match: {
+                        timestamp: { $gte: hace30Dias },
+                        severidad: { $in: ['warning', 'error', 'critical'] }
+                    }
+                },
+                {
+                    $group: {
+                        _id: '$severidad',
+                        count: { $sum: 1 }
+                    }
+                }
+            ])
+        ]);
+
+        // Simular datos de dispositivos (puedes reemplazar con datos reales)
+        const totalDispositivos = totalMascotas; // Asumiendo 1 dispositivo por mascota
+        const dispositivosConectados = Math.floor(totalDispositivos * 0.8); // 80% conectados
+        const usuariosActivos = Math.floor(totalUsuarios * 0.6); // 60% activos
+
+        // Actividad mensual simulada (últimos 6 meses)
+        const actividadMensual = [
+            Math.floor(Math.random() * 50) + 20,
+            Math.floor(Math.random() * 50) + 25,
+            Math.floor(Math.random() * 50) + 30,
+            Math.floor(Math.random() * 50) + 35,
+            Math.floor(Math.random() * 50) + 40,
+            totalMascotas
+        ];
+
+        // Dispositivos activos por hora (últimas 24 horas, por rango de 4 horas)
+        const dispositivosPorHora = Array.from({ length: 6 }, () => 
+            Math.floor(Math.random() * dispositivosConectados) + Math.floor(dispositivosConectados * 0.3)
+        );
+
+        const metricas = {
+            resumen: {
+                total_usuarios: totalUsuarios,
+                usuarios_nuevos_30d: usuariosNuevos30d,
+                total_mascotas: totalMascotas,
+                mascotas_nuevas_30d: mascotasNuevas30d,
+                total_dispositivos: totalDispositivos,
+                dispositivos_conectados: dispositivosConectados,
+                alertas_24h: alertas24h,
+                usuarios_activos: usuariosActivos
+            },
+            graficos: {
+                mascotas_por_especie: mascotasPorEspecie,
+                alertas_por_tipo: alertasPorTipo,
+                actividad_mensual: actividadMensual,
+                dispositivos_por_hora: dispositivosPorHora
+            },
+            timestamp: now.toISOString()
+        };
+
+        console.log('✅ Métricas del dashboard obtenidas:', {
+            usuarios: totalUsuarios,
+            mascotas: totalMascotas,
+            alertas: alertas24h
+        });
+
+        res.json(metricas);
+
+    } catch (error) {
+        console.error('❌ Error obteniendo métricas del dashboard:', error);
+        res.status(500).json({ 
+            message: 'Error obteniendo métricas del dashboard',
+            error: error.message 
+        });
+    }
+};
+
 module.exports = auditoriaController;

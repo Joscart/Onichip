@@ -116,6 +116,9 @@ app.use('/api/admin', require('./src/routes/admin.routes'));
 // Auditoría del sistema
 app.use('/api/admin/auditoria', require('./src/routes/auditoria.routes'));
 
+// Reportes y dashboard
+app.use('/api/admin/reportes', require('./src/routes/reportes.routes'));
+
 // ================================================
 // 🔍 MIDDLEWARE DE LOGGING PERSONALIZADO
 // ================================================
@@ -141,8 +144,15 @@ app.get('/', (req, res) => {
             usuarios: '/api/usuarios',
             admin: '/api/admin',
             auditoria: '/api/admin/auditoria',
+            reportes: '/api/admin/reportes',
             gps: '/api/gps',
             geofences: '/api/geofences'
+        },
+        nuevas_funciones: {
+            dashboard_metrics: '/api/admin/reportes/dashboard-metrics',
+            chart_data: '/api/admin/reportes/chart-data',
+            critical_events: '/api/admin/reportes/critical-events',
+            performance_stats: '/api/admin/reportes/performance-stats'
         },
         timestamp: new Date().toISOString()
     });

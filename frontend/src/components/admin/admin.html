@@ -39,7 +39,7 @@
     <div class="header-right">
       <span class="admin-info">
         <span class="emoji">👨‍💼</span>
-        {{ adminData?.nombre }} ({{ adminData?.rol }})
+        {{ adminData?.nombre }} (Admin)
       </span>
       <button (click)="logout()" class="logout-btn">
         <span class="emoji">🚪</span> Cerrar Sesión
@@ -73,37 +73,54 @@
       class="nav-btn">
       <span class="emoji">📋</span> Reportes
     </button>
+    <button
+      [class.active]="activeTab === 'alertas'"
+      (click)="setActiveTab('alertas')"
+      class="nav-btn">
+      <span class="emoji">🚨</span> Alertas
+    </button>
   </nav>
 
   <!-- Contenido principal -->
   <main class="admin-content">
 
-    <!-- 📊 DASHBOARD -->
+    <!-- 📊 DASHBOARD COMPLETO -->
     <div *ngIf="activeTab === 'dashboard'" class="dashboard-tab">
+      <!-- Header del dashboard con botón de actualizar -->
+      <div class="dashboard-header">
+        <div class="dashboard-title">
+          <h2><span class="emoji">📊</span> Dashboard Ejecutivo</h2>
+          <p>Monitoreo en tiempo real del sistema IoT</p>
+        </div>
+        <button (click)="loadDashboardData()" class="refresh-btn-small" [disabled]="loadingStats" title="Actualizar datos">
+          <span class="emoji">{{ loadingStats ? '⏳' : '🔄' }}</span>
+        </button>
+      </div>
+
       <!-- Estadísticas rápidas -->
       <div class="stats-grid">
         <div class="stat-card primary">
           <span class="emoji">👥</span>
           <div class="stat-info">
-            <h3>{{ stats.totalUsuarios || 0 }}</h3>
+            <h3>{{ getTotalUsuarios() }}</h3>
             <p>Total Usuarios</p>
-            <small>+{{ stats.nuevosUsuarios30d || 0 }} este mes</small>
+            <small>+{{ getNuevosUsuarios30d() }} este mes</small>
           </div>
         </div>
 
         <div class="stat-card success">
           <span class="emoji">🐕</span>
           <div class="stat-info">
-            <h3>{{ stats.totalMascotas || 0 }}</h3>
+            <h3>{{ getTotalMascotas() }}</h3>
             <p>Total Mascotas</p>
-            <small>+{{ stats.nuevasMascotas30d || 0 }} este mes</small>
+            <small>+{{ getNuevasMascotas30d() }} este mes</small>
           </div>
         </div>
 
         <div class="stat-card warning">
           <span class="emoji">📈</span>
           <div class="stat-info">
-            <h3>{{ ((stats.nuevosUsuarios30d || 0) * 100 / (stats.totalUsuarios || 1)).toFixed(1) }}%</h3>
+            <h3>{{ getCrecimientoUsuarios() }}%</h3>
             <p>Crecimiento</p>
             <small>Últimos 30 días</small>
           </div>
@@ -112,29 +129,29 @@
         <div class="stat-card info">
           <span class="emoji">🎯</span>
           <div class="stat-info">
-            <h3>{{ ((stats.totalMascotas || 0) / (stats.totalUsuarios || 1)).toFixed(1) }}</h3>
+            <h3>{{ getPromedioMascotasPorUsuario() }}</h3>
             <p>Mascotas/Usuario</p>
             <small>Promedio</small>
           </div>
         </div>
       </div>
 
-      <!-- Alertas del sistema -->
+      <!-- Eventos recientes del sistema -->
       <div class="alerts-section">
-        <h3><span class="emoji">🚨</span> Alertas del Sistema</h3>
+        <h3><span class="emoji">�</span> Eventos Recientes del Sistema</h3>
         <div class="alerts-grid">
-          <div *ngFor="let alerta of alertas" [class]="'alert ' + getAlertClass(alerta.tipo)">
-            <span class="emoji">{{ alerta['icono'] }}</span>
+          <div *ngFor="let log of auditLogs.slice(0, 5)" class="alert alert-info">
+            <span class="emoji">📝</span>
             <div class="alert-content">
-              <h4>{{ alerta['titulo'] }}</h4>
-              <p>{{ alerta.mensaje }}</p>
+              <h4>{{ log.accion }}</h4>
+              <p>{{ log.actor_tipo }}: {{ log.actor_id }} - {{ log.fecha_hora | date:'short' }}</p>
             </div>
           </div>
-          <div *ngIf="alertas.length === 0" class="alert alert-success">
+          <div *ngIf="auditLogs.length === 0" class="alert alert-success">
             <span class="emoji">✅</span>
             <div class="alert-content">
-              <h4>Todo en orden</h4>
-              <p>No hay alertas en este momento</p>
+              <h4>Sistema en calma</h4>
+              <p>No hay eventos recientes registrados</p>
             </div>
           </div>
         </div>
@@ -144,10 +161,65 @@
       <div class="charts-section">
         <h3><span class="emoji">📊</span> Distribución de Mascotas</h3>
         <div class="species-grid">
-          <div *ngFor="let especie of stats.mascotasPorEspecie" class="species-card">
+          <div *ngFor="let especie of getMascotasPorEspecie()" class="species-card">
             <span class="emoji">{{ especie._id === 'Perro' ? '🐕' : especie._id === 'Gato' ? '🐱' : '🐾' }}</span>
             <h4>{{ especie.count }}</h4>
             <p>{{ especie._id }}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Métricas del sistema -->
+      <div class="system-metrics">
+        <h3><span class="emoji">⚡</span> Rendimiento del Sistema</h3>
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <span class="emoji">📊</span>
+            <div class="metric-info">
+              <h4>{{ getDispositivosActivos() }}</h4>
+              <p>Dispositivos Activos</p>
+              <small>En tiempo real</small>
+            </div>
+          </div>
+          <div class="metric-card">
+            <span class="emoji">�</span>
+            <div class="metric-info">
+              <h4>{{ auditLogs.length }}</h4>
+              <p>Eventos Totales</p>
+              <small>Auditoría del sistema</small>
+            </div>
+          </div>
+          <div class="metric-card">
+            <span class="emoji">👨‍💻</span>
+            <div class="metric-info">
+              <h4>{{ getUsuariosActivos() }}</h4>
+              <p>Usuarios Activos</p>
+              <small>Este mes</small>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dashboard con Gráficos Estadísticos -->
+      <div class="dashboard-charts-section">
+        <h3><span class="emoji">📈</span> Análisis Estadístico</h3>
+        <div class="charts-grid">
+          <!-- Gráfico de Pastel -->
+          <div class="chart-container">
+            <h4>Distribución de Mascotas por Tipo</h4>
+            <canvas #pieChart class="chart-canvas"></canvas>
+          </div>
+
+          <!-- Gráfico de Barras -->
+          <div class="chart-container">
+            <h4>Actividad Mensual de Dispositivos</h4>
+            <canvas #barChart class="chart-canvas"></canvas>
+          </div>
+
+          <!-- Gráfico de Líneas -->
+          <div class="chart-container">
+            <h4>Dispositivos Activos por Horario</h4>
+            <canvas #lineChart class="chart-canvas"></canvas>
           </div>
         </div>
       </div>
@@ -293,6 +365,79 @@
       </div>
     </div>
 
+    <!-- 🚨 ALERTAS CRÍTICAS -->
+    <div *ngIf="activeTab === 'alertas'" class="alertas-tab">
+      <div class="tab-header">
+        <h2><span class="emoji">🚨</span> Centro de Auditoría del Sistema</h2>
+        <div class="tab-actions">
+          <button (click)="loadAuditLogs()" class="refresh-btn" [disabled]="loading">
+            <span class="emoji">🔄</span>
+            {{ loading ? 'Actualizando...' : 'Actualizar' }}
+          </button>
+        </div>
+      </div>
+
+      <div class="alerts-summary">
+        <div class="summary-grid">
+          <div class="summary-card info">
+            <span class="emoji">�</span>
+            <div class="summary-info">
+              <h3>{{ auditLogs.length }}</h3>
+              <p>Total Eventos</p>
+            </div>
+          </div>
+          <div class="summary-card success">
+            <span class="emoji">✅</span>
+            <div class="summary-info">
+              <h3>{{ getTotalEventosExitosos() }}</h3>
+              <p>Eventos Exitosos</p>
+            </div>
+          </div>
+          <div class="summary-card warning">
+            <span class="emoji">⚠️</span>
+            <div class="summary-info">
+              <h3>{{ getTotalEventosAdvertencia() }}</h3>
+              <p>Advertencias</p>
+            </div>
+          </div>
+          <div class="summary-card error">
+            <span class="emoji">❌</span>
+            <div class="summary-info">
+              <h3>{{ getTotalEventosError() }}</h3>
+              <p>Errores</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lista de eventos de auditoría -->
+      <div class="alerts-list">
+        <div *ngIf="auditLogs.length === 0" class="no-data">
+          <span class="emoji">📭</span>
+          <p>No hay eventos de auditoría disponibles</p>
+        </div>
+
+        <div *ngFor="let log of auditLogs" class="alert-item">
+          <div class="alert-icon">
+            <span class="emoji">📝</span>
+          </div>
+          <div class="alert-content">
+            <div class="alert-header">
+              <h4 class="alert-title">{{ log.accion }}</h4>
+              <span class="alert-timestamp">{{ log.fecha_hora | date:'short' }}</span>
+            </div>
+            <div class="alert-details">
+              <p><strong>Actor:</strong> {{ log.actor_tipo }} - {{ log.actor_id }}</p>
+              <p><strong>Entidad:</strong> {{ log.entidad_tipo }} (ID: {{ log.entidad_id }})</p>
+              <div *ngIf="log.detalles" class="alert-extra">
+                <strong>Detalles:</strong> {{ log.detalles }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </main>
 </div>
 
@@ -389,32 +534,8 @@
 <div *ngIf="activeTab === 'reportes'" id="reportes" class="reportes-tab">
   <div class="reportes-container">
     <div class="reportes-header">
-      <h2><span class="emoji">📋</span> Sistema de Reportes IoT</h2>
-      <p>Genere reportes detallados y visualice estadísticas en tiempo real</p>
-    </div>
-
-    <!-- Dashboard con Gráficos -->
-    <div class="dashboard-section">
-      <h3><span class="emoji">📊</span> Dashboard Estadístico</h3>
-      <div class="charts-grid">
-        <!-- Gráfico de Pastel -->
-        <div class="chart-container">
-          <h4>Distribución de Mascotas por Tipo</h4>
-          <canvas #pieChart class="chart-canvas"></canvas>
-        </div>
-
-        <!-- Gráfico de Barras -->
-        <div class="chart-container">
-          <h4>Actividad Mensual de Dispositivos</h4>
-          <canvas #barChart class="chart-canvas"></canvas>
-        </div>
-
-        <!-- Gráfico de Líneas -->
-        <div class="chart-container">
-          <h4>Dispositivos Activos por Horario</h4>
-          <canvas #lineChart class="chart-canvas"></canvas>
-        </div>
-      </div>
+      <h2><span class="emoji">📋</span> Sistema de Reportes</h2>
+      <p>Genere reportes basados en auditoría y datos del sistema</p>
     </div>
 
     <!-- Generador de Reportes -->
@@ -425,11 +546,11 @@
           <div class="form-group">
             <label>Tipo de Reporte</label>
             <select [(ngModel)]="reporteFilters.tipoReporte" name="tipoReporte">
-              <option value="dispositivos">Dispositivos IoT</option>
-              <option value="ubicaciones">Historial de Ubicaciones</option>
-              <option value="alertas">Alertas del Sistema</option>
-              <option value="estadisticas">Estadísticas Generales</option>
+              <option *ngFor="let tipo of tiposReporteFuncionales" [value]="tipo.value">
+                {{ tipo.label }}
+              </option>
             </select>
+            <small class="form-help">{{ getDescripcionTipoReporte(reporteFilters.tipoReporte) }}</small>
           </div>
 
           <div class="form-group">
@@ -442,125 +563,97 @@
             <input type="date" [(ngModel)]="reporteFilters.fechaFin" name="fechaFin">
           </div>
 
-          <div class="form-group">
-            <label>Mascota (Opcional)</label>
-            <select [(ngModel)]="reporteFilters.mascotaId" name="mascotaId">
-              <option value="">Todas las mascotas</option>
-              <option *ngFor="let mascota of mascotas" [value]="mascota._id">
-                {{ mascota.nombre }} ({{ mascota.especie }})
-              </option>
-            </select>
-          </div>
+          <!-- Búsqueda de Usuario para reporte personalizado -->
         </div>
 
         <div class="filter-actions">
-          <button type="submit" class="primary-btn" [disabled]="loading">
-            <span *ngIf="!loading">📊</span>
-            {{ loading ? 'Generando...' : 'Generar Vista Previa' }}
+          <button type="submit" class="primary-btn" [disabled]="generatingReport">
+            <span *ngIf="!generatingReport">📊</span>
+            <span *ngIf="generatingReport">⏳</span>
+            {{ generatingReport ? 'Generando...' : 'Generar Reporte' }}
           </button>
 
           <button type="button"
                   (click)="exportToExcel()"
-                  class="secondary-btn"
-                  [disabled]="loading">
+                  class="export-button secondary-btn"
+                  [disabled]="reporteData.total === 0 || loading">
             📄 Exportar a Excel
           </button>
 
           <button type="button"
                   (click)="exportToPDF()"
-                  class="secondary-btn"
-                  [disabled]="loading">
+                  class="export-button secondary-btn"
+                  [disabled]="reporteData.total === 0 || loading">
             📋 Exportar a PDF
           </button>
+        </div>
+
+        <!-- Barra de progreso de generación -->
+        <div *ngIf="generatingReport" class="progress-section">
+          <div class="progress-header">
+            <h4>Generando Reporte...</h4>
+            <span class="progress-percentage">{{ reportProgress }}%</span>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" [style.width.%]="reportProgress"></div>
+          </div>
+          <p class="progress-status">{{ currentOperation }}</p>
         </div>
       </form>
     </div>
 
     <!-- Vista Previa de Datos -->
     <div *ngIf="reporteData?.total && reporteData.total > 0" class="data-preview">
-      <h4>Vista Previa del Reporte: {{ reporteFilters.tipoReporte }}</h4>
-      <p><strong>Período:</strong> {{ reporteFilters.fechaInicio }} al {{ reporteFilters.fechaFin }}</p>
-      <p><strong>Total de registros:</strong> {{ reporteData.total }}</p>
+      <div class="preview-header">
+        <h4>Vista Previa del Reporte: {{ reporteFilters.tipoReporte }}</h4>
+        <div class="preview-info">
+          <span class="info-badge">
+            <span class="emoji">📅</span>
+            Período: {{ reporteFilters.fechaInicio ? (reporteFilters.fechaInicio | date:'dd/MM/yyyy') : 'Sin filtro' }}
+            - {{ reporteFilters.fechaFin ? (reporteFilters.fechaFin | date:'dd/MM/yyyy') : 'Sin filtro' }}
+          </span>
+          <span class="info-badge">
+            <span class="emoji">📊</span>
+            Total: {{ reporteData.total }} registros
+          </span>
+        </div>
+      </div>
 
       <!-- Tabla de datos -->
       <div class="table-content">
         <table class="preview-table">
           <thead>
-            <tr *ngIf="reporteFilters.tipoReporte === 'dispositivos'">
-              <th>ID</th>
-              <th>Serial</th>
-              <th>Modelo</th>
-              <th>Estado</th>
-              <th>Batería</th>
-              <th>Última Conexión</th>
-              <th>Mascota</th>
-              <th>Usuario</th>
-            </tr>
-            <tr *ngIf="reporteFilters.tipoReporte === 'ubicaciones'">
-              <th>Fecha/Hora</th>
-              <th>Mascota</th>
-              <th>Latitud</th>
-              <th>Longitud</th>
-              <th>Precisión</th>
-              <th>Velocidad</th>
-              <th>Método</th>
-              <th>Batería</th>
-            </tr>
-            <tr *ngIf="reporteFilters.tipoReporte === 'alertas'">
-              <th>Fecha/Hora</th>
-              <th>Tipo</th>
-              <th>Prioridad</th>
-              <th>Mensaje</th>
-              <th>Dispositivo</th>
-              <th>Estado</th>
+            <tr>
+              <th *ngFor="let key of getPreviewHeaders()">{{ key | titlecase }}</th>
             </tr>
           </thead>
           <tbody>
-            <!-- Dispositivos -->
-            <tr *ngFor="let item of getReporteDataSlice(10)"
-                [hidden]="reporteFilters.tipoReporte !== 'dispositivos'">
-              <td>{{ item.id || item.deviceId }}</td>
-              <td>{{ item.serial }}</td>
-              <td>{{ item.modelo }}</td>
-              <td>{{ item.estado }}</td>
-              <td>{{ item.bateria }}</td>
-              <td>{{ item.ultimaConexion | date:'short' }}</td>
-              <td>{{ item.mascota }}</td>
-              <td>{{ item.usuario }}</td>
-            </tr>
-
-            <!-- Ubicaciones -->
-            <tr *ngFor="let item of getUbicacionesSlice(10)"
-                [hidden]="reporteFilters.tipoReporte !== 'ubicaciones'">
-              <td>{{ item.timestamp | date:'short' }}</td>
-              <td>{{ item.mascota }}</td>
-              <td>{{ item.latitude }}</td>
-              <td>{{ item.longitude }}</td>
-              <td>{{ item.accuracy }}m</td>
-              <td>{{ item.speed }}km/h</td>
-              <td>{{ item.method }}</td>
-              <td>{{ item.battery }}</td>
-            </tr>
-
-            <!-- Alertas -->
-            <tr *ngFor="let item of getAlertasSlice(10)"
-                [hidden]="reporteFilters.tipoReporte !== 'alertas'">
-              <td>{{ item.timestamp | date:'short' }}</td>
-              <td>{{ item.tipo }}</td>
-              <td>{{ item.prioridad }}</td>
-              <td>{{ item.mensaje }}</td>
-              <td>{{ item.dispositivo }}</td>
-              <td>{{ item.estado }}</td>
+            <tr *ngFor="let item of getReporteDataSlice(10)">
+              <td *ngFor="let key of getPreviewHeaders()">{{ item[key] }}</td>
             </tr>
           </tbody>
         </table>
       </div>
 
-      <div *ngIf="reporteData.total > 10" class="text-center mt-4">
-        <small class="text-sm text-gray-600">
+      <div class="preview-footer">
+        <div *ngIf="reporteData.total > 10" class="pagination-info">
+          <span class="emoji">📄</span>
           Mostrando 10 de {{ reporteData.total }} registros.
           Use la exportación para ver todos los datos.
-        </small>
+        </div>
+        <div class="export-reminder">
+          <span class="emoji">💡</span>
+          Los botones de exportación están habilitados después de generar el reporte
+        </div>
+      </div>
+    </div>
+
+    <!-- Estado cuando no hay datos -->
+    <div *ngIf="!generatingReport && (!reporteData?.total || reporteData.total === 0)" class="no-data-state">
+      <div class="no-data-content">
+        <span class="emoji">📊</span>
+        <h4>No hay datos para mostrar</h4>
+        <p>Seleccione los filtros y haga clic en "Generar Reporte" para ver los datos</p>
       </div>
     </div>
   </div>

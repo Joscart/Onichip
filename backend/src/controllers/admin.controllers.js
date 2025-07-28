@@ -15,6 +15,7 @@ const Usuario = require('../models/usuario');
 const Mascota = require('../models/mascota');
 const { Ubicacion, Geofence, WifiLocationCache } = require('../models/ubicacion');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const ExcelJS = require('exceljs');
 const fs = require('fs');
 const path = require('path');
@@ -59,6 +60,18 @@ adminController.loginAdmin = async (req, res) => {
             return res.status(401).json({ message: 'Contraseña incorrecta.' });
         }
 
+        // Generar token JWT
+        const token = jwt.sign(
+            { 
+                id: admin._id, 
+                email: admin.email,
+                tipo: 'admin',
+                rol: admin.rol
+            }, 
+            process.env.JWT_SECRET || 'onichip-secret-key', 
+            { expiresIn: '24h' }
+        );
+
         // Actualizar último acceso
         admin.ultimoAcceso = new Date();
         await admin.save();
@@ -70,8 +83,10 @@ adminController.loginAdmin = async (req, res) => {
                 email: admin.email,
                 nombre: admin.nombre,
                 rol: admin.rol,
-                permisos: admin.permisos
-            }
+                permisos: admin.permisos,
+                token: token
+            },
+            token: token
         });
     } catch (error) {
         console.error('Error en login admin:', error);

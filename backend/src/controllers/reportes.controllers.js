@@ -13,7 +13,9 @@
 const Usuario = require('../models/usuario');
 const Mascota = require('../models/mascota');
 const { Ubicacion } = require('../models/ubicacion');
+const Auditoria = require('../models/auditoria');
 const ExcelJS = require('exceljs');
+const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
 
@@ -22,69 +24,155 @@ const reportesController = {};
 /**
  * 📊 Obtener reportes básicos
  * 
- * @description Obtiene estadísticas básicas y reportes predefinidos del sistema
+ * @description Obtiene estadísticas basadas en datos de auditoría del sistema
  * @route GET /api/admin/reportes
  * @access Admin
  * 
  * @input None - No requiere parámetros
  * 
- * @output {Object} 200 - Reportes básicos del sistema
+ * @output {Object} 200 - Reportes básicos del sistema basados en auditoría
  * @output {Object} 500 - Error interno del servidor
  */
 reportesController.getReportes = async (req, res) => {
     try {
+        console.log('📊 Generando reportes básicos desde auditoría...');
+        const startTime = Date.now();
+
         const reportes = await Promise.all([
-            // Usuarios por mes
-            Usuario.aggregate([
+            // Actividad de usuarios por mes desde auditoría
+            Auditoria.aggregate([
+                {
+                    $match: {
+                        'actor.tipo': 'usuario',
+                        accion: { $in: ['CREATE', 'UPDATE', 'LOGIN'] },
+                        'actor.nombre': { $exists: true, $ne: null }
+                    }
+                },
                 {
                     $group: {
                         _id: { 
-                            year: { $year: '$createdAt' },
-                            month: { $month: '$createdAt' }
+                            year: { $year: '$timestamp' },
+                            month: { $month: '$timestamp' }
                         },
-                        count: { $sum: 1 }
+                        count: { $sum: 1 },
+                        usuarios_unicos: { $addToSet: '$actor.id' }
+                    }
+                },
+                {
+                    $addFields: {
+                        usuarios_activos: { $size: '$usuarios_unicos' }
                     }
                 },
                 { $sort: { '_id.year': -1, '_id.month': -1 } },
                 { $limit: 12 }
             ]),
 
-            // Mascotas por edad
-            Mascota.aggregate([
+            // Operaciones por tipo de entidad (filtrar entidades válidas)
+            Auditoria.aggregate([
+                {
+                    $match: {
+                        entidad: { $exists: true, $ne: null, $ne: '' }
+                    }
+                },
+                {
+                    $group: {
+                        _id: '$entidad',
+                        total_operaciones: { $sum: 1 },
+                        creates: {
+                            $sum: { $cond: [{ $eq: ['$accion', 'CREATE'] }, 1, 0] }
+                        },
+                        updates: {
+                            $sum: { $cond: [{ $eq: ['$accion', 'UPDATE'] }, 1, 0] }
+                        },
+                        deletes: {
+                            $sum: { $cond: [{ $eq: ['$accion', 'DELETE'] }, 1, 0] }
+                        }
+                    }
+                },
+                { $sort: { total_operaciones: -1 } }
+            ]),
+
+            // Top usuarios más activos (con campos válidos)
+            Auditoria.aggregate([
+                {
+                    $match: {
+                        'actor.tipo': 'usuario',
+                        'actor.nombre': { $exists: true, $ne: null, $ne: '' },
+                        'actor.email': { $exists: true, $ne: null, $ne: '' },
+                        timestamp: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }
+                    }
+                },
+                {
+                    $group: {
+                        _id: '$actor.id',
+                        nombre: { $first: '$actor.nombre' },
+                        email: { $first: '$actor.email' },
+                        actividad: { $sum: 1 },
+                        ultima_actividad: { $max: '$timestamp' }
+                    }
+                },
+                { $sort: { actividad: -1 } },
+                { $limit: 10 }
+            ]),
+
+            // Actividad GPS y ubicaciones (filtrar objetivos válidos)
+            Auditoria.aggregate([
+                {
+                    $match: {
+                        $or: [
+                            { entidad: 'ubicacion' },
+                            { accion: 'GPS_UPDATE' },
+                            { categoria: 'gps' }
+                        ],
+                        timestamp: { $exists: true }
+                    }
+                },
                 {
                     $group: {
                         _id: {
-                            $switch: {
-                                branches: [
-                                    { case: { $lt: ['$edad', 1] }, then: 'Cachorro' },
-                                    { case: { $lt: ['$edad', 3] }, then: 'Joven' },
-                                    { case: { $lt: ['$edad', 7] }, then: 'Adulto' },
-                                    { case: { $gte: ['$edad', 7] }, then: 'Senior' }
-                                ],
-                                default: 'Desconocido'
-                            }
+                            date: { $dateToString: { format: '%Y-%m-%d', date: '$timestamp' } }
                         },
-                        count: { $sum: 1 }
+                        ubicaciones: { $sum: 1 },
+                        dispositivos_activos: { 
+                            $addToSet: { 
+                                $cond: [
+                                    { $and: [
+                                        { $ne: ['$objetivo.id', null] },
+                                        { $ne: ['$objetivo.id', ''] }
+                                    ]},
+                                    '$objetivo.id',
+                                    '$$REMOVE'
+                                ]
+                            }
+                        }
                     }
-                }
-            ]),
-
-            // Top 5 razas más populares
-            Mascota.aggregate([
-                { $group: { _id: '$raza', count: { $sum: 1 } } },
-                { $sort: { count: -1 } },
-                { $limit: 5 }
+                },
+                {
+                    $addFields: {
+                        dispositivos_count: { $size: '$dispositivos_activos' }
+                    }
+                },
+                { $sort: { '_id.date': -1 } },
+                { $limit: 7 }
             ])
         ]);
 
-        console.log('✅ Reportes básicos generados exitosamente');
+        const processingTime = Date.now() - startTime;
+        
+        console.log(`✅ Reportes básicos generados desde auditoría en ${processingTime}ms`);
         res.json({
-            usuariosPorMes: reportes[0],
-            mascotasPorEdad: reportes[1],
-            razasPopulares: reportes[2]
+            actividadUsuarios: reportes[0],
+            operacionesPorEntidad: reportes[1],
+            usuariosActivos: reportes[2],
+            actividadGPS: reportes[3],
+            metadata: {
+                generado: new Date().toISOString(),
+                processingTime,
+                fuente: 'auditoria'
+            }
         });
     } catch (error) {
-        console.error('❌ Error al generar reportes:', error);
+        console.error('❌ Error al generar reportes desde auditoría:', error);
         res.status(500).json({ 
             message: 'Error al generar reportes',
             error: error.message 
@@ -93,231 +181,132 @@ reportesController.getReportes = async (req, res) => {
 };
 
 /**
- * 📄 Generar reporte Excel
- * 
- * @description Genera reportes personalizados en formato Excel con datos reales
+ * 📄 Generar y exportar Excel genérico
+ *
+ * @description Función principal para exportar datos a Excel.
  * @route POST /api/admin/generate-excel
  * @access Admin
- * 
- * @input {Object} req.body - Parámetros del reporte
- * @input {string} req.body.tipoReporte - Tipo de reporte (dispositivos/ubicaciones/estadisticas)
- * @input {string} req.body.fechaInicio - Fecha de inicio del reporte
- * @input {string} req.body.fechaFin - Fecha de fin del reporte
- * @input {string} req.body.mascotaId - ID de mascota específica (opcional)
- * 
+ *
+ * @input {Array<Object>} data - Array de registros con claves dinámicas
+ * @input {string} tipo - Tipo de reporte a generar (dispositivos, ubicaciones, estadisticas, etc.) y nombre de la hoja
+ * @input {string} [fechaInicio] - Filtro fecha inicio (opcional)
+ * @input {string} [fechaFin] - Filtro fecha fin (opcional)
+ * @input {string} [usuario] - Filtro por usuario (opcional)
+ * @input {string} [mascota] - Filtro por mascota (opcional)
+ *
  * @output {File} 200 - Archivo Excel generado
  * @output {Object} 400 - Parámetros inválidos
- * @output {Object} 500 - Error interno del servidor
  */
 reportesController.generateExcelReport = async (req, res) => {
     try {
-        const { tipoReporte, fechaInicio, fechaFin, mascotaId } = req.body;
-        console.log('📄 Generando Excel con datos reales...', { tipoReporte, fechaInicio, fechaFin, mascotaId });
-
-        // Validar parámetros requeridos
-        if (!tipoReporte || !fechaInicio || !fechaFin) {
-            return res.status(400).json({ 
-                message: 'Faltan parámetros requeridos: tipoReporte, fechaInicio, fechaFin' 
+        const { data, tipo, fechaInicio, fechaFin, mascota } = req.body;
+        
+        // Validar parámetros básicos
+        if (!Array.isArray(data) || data.length === 0 || !tipo) {
+            return res.status(400).json({
+                message: 'Parámetros requeridos: data (Array) y tipo (string)'
             });
         }
-
-        // Crear filtros de fecha
-        const fechaInicioObj = new Date(fechaInicio + 'T00:00:00.000Z');
-        const fechaFinObj = new Date(fechaFin + 'T23:59:59.999Z');
-
+        
+        // Filtrar datos por fecha si se proveen
+        let filtered = data;
+        if (fechaInicio && fechaFin) {
+            console.log('🔍 Debug fechas recibidas:', { fechaInicio, fechaFin });
+            
+            // Validar y parsear fechas correctamente
+            const start = new Date(fechaInicio);
+            const end = new Date(fechaFin);
+            
+            console.log('📅 Fechas parseadas:', { start, end });
+            
+            // Verificar que las fechas sean válidas
+            if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+                console.error('❌ Fechas inválidas recibidas:', { fechaInicio, fechaFin });
+                return res.status(400).json({
+                    message: 'Formato de fecha inválido. Use formato ISO: YYYY-MM-DD'
+                });
+            }
+            
+            filtered = filtered.filter(item => {
+                const itemDate = new Date(item.timestamp || item.fecha || item.date || item.createdAt);
+                if (isNaN(itemDate.getTime())) {
+                    console.warn('⚠️ Fecha inválida en item:', item);
+                    return true; // Incluir items sin fecha válida
+                }
+                return itemDate >= start && itemDate <= end;
+            });
+            
+            console.log(`📊 Filtro aplicado: ${data.length} -> ${filtered.length} registros`);
+        }
+        
+        // Filtrar por mascota
+        if (mascota) {
+            filtered = filtered.filter(item => item.mascota === mascota || item.pet === mascota);
+        }
+        
+        // Crear workbook y worksheet
         const workbook = new ExcelJS.Workbook();
         workbook.creator = 'Onichip Admin';
-        workbook.created = new Date();
+        const sheetName = tipo.charAt(0).toUpperCase() + tipo.slice(1);
+        const worksheet = workbook.addWorksheet(sheetName);
         
-        const worksheet = workbook.addWorksheet('Reporte Onichip');
-
-        let data = [];
-        let columns = [];
-
-        switch (tipoReporte) {
-            case 'dispositivos':
-                // Obtener datos reales de mascotas
-                const filtroMascotas = {
-                    createdAt: { $gte: fechaInicioObj, $lte: fechaFinObj }
-                };
-                
-                if (mascotaId) {
-                    filtroMascotas._id = mascotaId;
-                }
-
-                const mascotas = await Mascota.find(filtroMascotas)
-                    .populate('propietario', 'nombre email')
-                    .sort({ createdAt: -1 });
-
-                columns = [
-                    { header: 'ID Dispositivo', key: 'id', width: 15 },
-                    { header: 'Serial', key: 'serial', width: 15 },
-                    { header: 'Modelo', key: 'modelo', width: 15 },
-                    { header: 'Estado', key: 'estado', width: 12 },
-                    { header: 'Batería', key: 'bateria', width: 10 },
-                    { header: 'Última Conexión', key: 'ultimaConexion', width: 20 },
-                    { header: 'Mascota', key: 'mascota', width: 15 },
-                    { header: 'Especie', key: 'especie', width: 12 },
-                    { header: 'Usuario', key: 'usuario', width: 20 },
-                    { header: 'Email', key: 'email', width: 25 }
-                ];
-                
-                data = mascotas.map((mascota, index) => ({
-                    id: `CHIP-${String(index + 1).padStart(3, '0')}`,
-                    serial: `ONI${mascota._id.toString().slice(-6).toUpperCase()}`,
-                    modelo: 'OnichipGPS-V2',
-                    estado: Math.random() > 0.2 ? 'Activo' : 'Inactivo',
-                    bateria: Math.floor(Math.random() * (95 - 15) + 15) + '%',
-                    ultimaConexion: new Date(Date.now() - Math.random() * 86400000).toLocaleString('es-ES'),
-                    mascota: mascota.nombre,
-                    especie: mascota.especie,
-                    usuario: mascota.propietario?.nombre || 'N/A',
-                    email: mascota.propietario?.email || 'N/A'
-                }));
-                break;
-
-            case 'ubicaciones':
-                const ubicaciones = await Ubicacion.find({
-                    timestamp: { $gte: fechaInicioObj, $lte: fechaFinObj }
-                })
-                .populate('mascotaId', 'nombre especie')
-                .sort({ timestamp: -1 })
-                .limit(500);
-
-                columns = [
-                    { header: 'Fecha/Hora', key: 'timestamp', width: 20 },
-                    { header: 'Mascota', key: 'mascota', width: 15 },
-                    { header: 'Especie', key: 'especie', width: 12 },
-                    { header: 'Latitud', key: 'latitude', width: 15 },
-                    { header: 'Longitud', key: 'longitude', width: 15 },
-                    { header: 'Precisión (m)', key: 'accuracy', width: 12 },
-                    { header: 'Velocidad (km/h)', key: 'speed', width: 15 },
-                    { header: 'Método', key: 'method', width: 10 }
-                ];
-                
-                data = ubicaciones.map(ub => ({
-                    timestamp: new Date(ub.timestamp).toLocaleString('es-ES'),
-                    mascota: ub.mascotaId?.nombre || 'N/A',
-                    especie: ub.mascotaId?.especie || 'N/A',
-                    latitude: ub.latitude,
-                    longitude: ub.longitude,
-                    accuracy: ub.accuracy || Math.floor(Math.random() * 50) + 5,
-                    speed: ub.speed || Math.floor(Math.random() * 20),
-                    method: ub.method || 'GPS'
-                }));
-                break;
-
-            case 'estadisticas':
-                const totalUsuarios = await Usuario.countDocuments({
-                    $or: [
-                        { createdAt: { $gte: fechaInicioObj, $lte: fechaFinObj } },
-                        { fechaRegistro: { $gte: fechaInicioObj, $lte: fechaFinObj } }
-                    ]
-                });
-                
-                const totalMascotasEst = await Mascota.countDocuments({
-                    createdAt: { $gte: fechaInicioObj, $lte: fechaFinObj }
-                });
-
-                const mascotasPorEspecie = await Mascota.aggregate([
-                    { $match: { createdAt: { $gte: fechaInicioObj, $lte: fechaFinObj } } },
-                    { $group: { _id: '$especie', count: { $sum: 1 } } }
-                ]);
-
-                columns = [
-                    { header: 'Métrica', key: 'metrica', width: 25 },
-                    { header: 'Valor', key: 'valor', width: 15 },
-                    { header: 'Descripción', key: 'descripcion', width: 40 }
-                ];
-                
-                data = [
-                    {
-                        metrica: 'Total Usuarios',
-                        valor: totalUsuarios,
-                        descripcion: `Usuarios registrados entre ${fechaInicio} y ${fechaFin}`
-                    },
-                    {
-                        metrica: 'Total Mascotas',
-                        valor: totalMascotasEst,
-                        descripcion: `Mascotas registradas entre ${fechaInicio} y ${fechaFin}`
-                    },
-                    {
-                        metrica: 'Promedio Mascotas/Usuario',
-                        valor: totalUsuarios > 0 ? (totalMascotasEst / totalUsuarios).toFixed(2) : 0,
-                        descripcion: 'Promedio de mascotas por usuario'
-                    },
-                    ...mascotasPorEspecie.map(esp => ({
-                        metrica: `Total ${esp._id}s`,
-                        valor: esp.count,
-                        descripcion: `Cantidad de ${esp._id.toLowerCase()}s registrados`
-                    }))
-                ];
-                break;
-
-            default:
-                return res.status(400).json({ 
-                    message: 'Tipo de reporte no válido. Use: dispositivos, ubicaciones, estadisticas' 
-                });
-        }
-
-        // Configurar columnas
-        worksheet.columns = columns;
-
-        // Agregar datos
-        data.forEach(row => {
-            worksheet.addRow(row);
+        // Columnas dinámicas
+        const headers = Object.keys(filtered[0]);
+        worksheet.columns = headers.map(key => ({
+            header: key.charAt(0).toUpperCase() + key.slice(1),
+            key,
+            width: 20
+        }));
+        
+        // Añadir filas
+        filtered.forEach(row => worksheet.addRow(row));
+        
+        // Estilar encabezados
+        worksheet.getRow(1).eachCell(cell => {
+            cell.font = { bold: true };
         });
-
-        // Aplicar estilos al header
-        worksheet.getRow(1).eachCell((cell) => {
-            cell.font = { bold: true, color: { argb: 'FFFFFF' } };
-            cell.fill = {
-                type: 'pattern',
-                pattern: 'solid',
-                fgColor: { argb: '7C3AED' }
-            };
-        });
-
+        
         // Configurar respuesta
-        const fileName = `reporte-onichip-${tipoReporte}-${Date.now()}.xlsx`;
+        const fileName = `reporte-${tipo}-${Date.now()}.xlsx`;
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-
+        
         // Enviar archivo
         await workbook.xlsx.write(res);
-        console.log(`✅ Archivo Excel generado: ${fileName} con ${data.length} registros reales`);
-
+        console.log(`✅ Archivo Excel generado: ${fileName} con ${filtered.length} registros`);
+        
     } catch (error) {
-        console.error('❌ Error generando Excel:', error);
-        res.status(500).json({ 
-            message: 'Error al generar Excel', 
-            error: error.message 
+        console.error('❌ Error generando Excel genérico:', error);
+        res.status(500).json({
+            message: 'Error al generar Excel',
+            error: error.message
         });
     }
 };
-
-/**
- * 📋 Generar reporte personalizado
- * 
- * @description Genera reporte personalizado con datos optimizados del sistema
- * @route POST /api/admin/generate-report
- * @access Admin
- * 
- * @input {Object} req.body - Parámetros del reporte
- * @input {string} req.body.tipoReporte - Tipo de reporte (dispositivos/ubicaciones/alertas/estadisticas)
- * @input {string} req.body.fechaInicio - Fecha de inicio del reporte
- * @input {string} req.body.fechaFin - Fecha de fin del reporte
- * @input {string} req.body.mascotaId - ID de mascota específica (opcional)
- * 
- * @output {Object} 200 - Reporte generado con datos
- * @output {Object} 400 - Tipo de reporte inválido
- * @output {Object} 500 - Error interno del servidor
- */
 reportesController.generateReport = async (req, res) => {
     try {
         const startTime = Date.now();
-        const { tipoReporte, fechaInicio, fechaFin, mascotaId } = req.body;
-        console.log('📊 Generando reporte personalizado:', { tipoReporte, fechaInicio, fechaFin, mascotaId });
+        const { 
+            tipoReporte, 
+            fechaInicio, 
+            fechaFin, 
+            actor, 
+            entidad, 
+            accion,
+            mascotaId 
+        } = req.body;
+        
+        console.log('📊 Generando reporte desde auditoría:', { 
+            tipoReporte, fechaInicio, fechaFin, actor, entidad, accion 
+        });
+
+        console.log('🔍 Debug tipos de datos recibidos:', {
+            tipoReporte_type: typeof tipoReporte,
+            fechaInicio_type: typeof fechaInicio,
+            fechaFin_type: typeof fechaFin,
+            fechaInicio_value: fechaInicio,
+            fechaFin_value: fechaFin
+        });
 
         // Validar parámetros requeridos
         if (!tipoReporte) {
@@ -327,134 +316,317 @@ reportesController.generateReport = async (req, res) => {
             });
         }
 
-        // Respuesta optimizada con datos del sistema
+        // Construir filtros de auditoría con validación de fechas
+        let filtrosAuditoria = {};
+        
+        if (fechaInicio && fechaFin) {
+            // Validar y parsear fechas
+            const startDate = new Date(fechaInicio);
+            const endDate = new Date(fechaFin);
+            
+            console.log('📅 Fechas parseadas para filtros:', { startDate, endDate });
+            
+            if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+                console.error('❌ Fechas inválidas para filtros:', { fechaInicio, fechaFin });
+                return res.status(400).json({ 
+                    message: 'Formato de fecha inválido para filtros',
+                    total: 0 
+                });
+            }
+            
+            // Asegurar que las fechas incluyan todo el día
+            startDate.setHours(0, 0, 0, 0);
+            endDate.setHours(23, 59, 59, 999);
+            
+            filtrosAuditoria.timestamp = {
+                $gte: startDate,
+                $lte: endDate
+            };
+            
+            console.log('✅ Filtros de fecha aplicados:', filtrosAuditoria.timestamp);
+        }
+        
+        if (actor) filtrosAuditoria['actor.tipo'] = actor;
+        if (entidad) filtrosAuditoria.entidad = entidad;
+        if (accion) filtrosAuditoria.accion = accion;
+
+        // Respuesta optimizada con datos de auditoría
         let reportData = {
             tipo: tipoReporte,
             periodo: { inicio: fechaInicio, fin: fechaFin },
+            filtros: { actor, entidad, accion },
             generado: new Date().toISOString(),
-            processingTime: 0
+            processingTime: 0,
+            fuente: 'auditoria'
         };
 
         switch (tipoReporte) {
-            case 'dispositivos':
-                console.log('📱 Generando reporte de dispositivos...');
+            case 'auditoria':
+                console.log('🕵️ Generando reporte de auditoría completa...');
                 
-                // Consulta optimizada - solo datos esenciales
-                const mascotas = await Mascota.find({})
-                    .select('nombre especie createdAt')
-                    .populate('propietario', 'nombre email')
-                    .limit(50);
+                const registrosAuditoria = await Auditoria.find(filtrosAuditoria)
+                    .sort({ timestamp: -1 })
+                    .limit(100)
+                    .lean();
 
-                reportData.total = mascotas.length;
-                reportData.dispositivos = mascotas.map((mascota, index) => ({
-                    id: `CHIP-${(index + 1).toString().padStart(3, '0')}`,
-                    serial: `ONI${mascota._id.toString().slice(-6).toUpperCase()}`,
-                    modelo: 'OnichipGPS-V2',
-                    estado: Math.random() > 0.3 ? 'Activo' : 'Inactivo',
-                    bateria: Math.floor(Math.random() * 85 + 15) + '%',
-                    ultimaConexion: new Date(Date.now() - Math.random() * 3600000),
-                    mascotaNombre: mascota.nombre,
-                    mascota: mascota.nombre,
-                    usuarioNombre: mascota.propietario?.nombre || 'N/A',
-                    usuario: mascota.propietario?.nombre || 'N/A',
-                    especie: mascota.especie
+                reportData.total = registrosAuditoria.length;
+                reportData.registros = registrosAuditoria.map(reg => ({
+                    timestamp: reg.timestamp,
+                    accion: reg.accion,
+                    entidad: reg.entidad,
+                    actor: {
+                        nombre: reg.actor?.nombre || 'N/A',
+                        tipo: reg.actor?.tipo || 'N/A',
+                        email: reg.actor?.email || 'N/A'
+                    },
+                    objetivo: reg.objetivo?.nombre || reg.objetivo?.tipo || 'N/A',
+                    resumen: reg.resumen || 'N/A',
+                    exitoso: reg.metadata?.exitoso !== false,
+                    tiempoEjecucion: reg.metadata?.tiempoEjecucion || 0
                 }));
                 break;
 
-            case 'ubicaciones':
-                console.log('📍 Generando reporte de ubicaciones...');
+            case 'actividad':
+                console.log('📈 Generando reporte de actividad...');
                 
-                const ubicacionesCount = await Ubicacion.countDocuments();
-                const ubicacionesMuestra = await Ubicacion.find({})
-                    .select('timestamp latitude longitude mascotaId')
-                    .populate('mascotaId', 'nombre')
-                    .sort({ timestamp: -1 })
-                    .limit(30);
+                const actividadPorHora = await Auditoria.aggregate([
+                    { $match: filtrosAuditoria },
+                    {
+                        $group: {
+                            _id: {
+                                fecha: { $dateToString: { format: '%Y-%m-%d', date: '$timestamp' } },
+                                hora: { $hour: '$timestamp' }
+                            },
+                            operaciones: { $sum: 1 },
+                            usuarios_activos: { $addToSet: '$actor.id' },
+                            tipos_accion: { $addToSet: '$accion' }
+                        }
+                    },
+                    {
+                        $addFields: {
+                            usuarios_count: { $size: '$usuarios_activos' },
+                            diversidad_acciones: { $size: '$tipos_accion' }
+                        }
+                    },
+                    { $sort: { '_id.fecha': -1, '_id.hora': 1 } },
+                    { $limit: 168 } // 7 días * 24 horas
+                ]);
 
-                reportData.total = Math.max(ubicacionesCount, 15);
-                reportData.ubicaciones = [];
-                
-                // Generar datos de muestra combinados con datos reales
-                for (let i = 0; i < Math.min(30, reportData.total); i++) {
-                    const ubicacion = ubicacionesMuestra[i] || {};
-                    reportData.ubicaciones.push({
-                        timestamp: ubicacion.timestamp || new Date(Date.now() - Math.random() * 86400000),
-                        mascota: ubicacion.mascotaId?.nombre || `Mascota ${i + 1}`,
-                        mascotaId: ubicacion.mascotaId?._id || null,
-                        latitude: ubicacion.latitude || (4.6 + Math.random() * 0.2),
-                        longitude: ubicacion.longitude || (-74.1 + Math.random() * 0.2),
-                        accuracy: Math.floor(Math.random() * 20 + 5),
-                        speed: Math.floor(Math.random() * 25),
-                        method: 'GPS',
-                        battery: Math.floor(Math.random() * 100) + '%'
-                    });
-                }
+                reportData.total = actividadPorHora.length;
+                reportData.actividad = actividadPorHora;
                 break;
 
-            case 'alertas':
-                console.log('🚨 Generando reporte de alertas...');
+            case 'dispositivos':
+                console.log('📱 Generando reporte de dispositivos desde auditoría...');
                 
-                reportData.total = Math.floor(Math.random() * 20 + 5);
-                reportData.alertas = [];
+                // Obtener actividad de dispositivos desde auditoría
+                const actividadDispositivos = await Auditoria.aggregate([
+                    {
+                        $match: {
+                            ...filtrosAuditoria,
+                            $or: [
+                                { entidad: 'mascota' },
+                                { entidad: 'ubicacion' },
+                                { accion: 'GPS_UPDATE' },
+                                { categoria: 'gps' }
+                            ]
+                        }
+                    },
+                    {
+                        $group: {
+                            _id: '$objetivo.id',
+                            nombre: { $first: '$objetivo.nombre' },
+                            ultima_actividad: { $max: '$timestamp' },
+                            operaciones: { $sum: 1 },
+                            tipos_operacion: { $addToSet: '$accion' },
+                            ubicaciones_registradas: {
+                                $sum: { $cond: [{ $eq: ['$entidad', 'ubicacion'] }, 1, 0] }
+                            }
+                        }
+                    },
+                    { $sort: { ultima_actividad: -1 } },
+                    { $limit: 50 }
+                ]);
+
+                // Complementar con datos de mascotas
+                const mascotas = await Mascota.find({})
+                    .populate('propietario', 'nombre email')
+                    .limit(50);
+
+                reportData.total = Math.max(actividadDispositivos.length, mascotas.length);
+                reportData.dispositivos = mascotas.map((mascota, index) => {
+                    const actividad = actividadDispositivos.find(
+                        act => act._id?.toString() === mascota._id.toString()
+                    );
+                    
+                    return {
+                        id: `CHIP-${(index + 1).toString().padStart(3, '0')}`,
+                        serial: `ONI${mascota._id.toString().slice(-6).toUpperCase()}`,
+                        mascota: mascota.nombre,
+                        especie: mascota.especie,
+                        propietario: mascota.propietario?.nombre || 'N/A',
+                        email: mascota.propietario?.email || 'N/A',
+                        ultima_actividad: actividad?.ultima_actividad || mascota.createdAt,
+                        operaciones_total: actividad?.operaciones || 0,
+                        ubicaciones_enviadas: actividad?.ubicaciones_registradas || 0,
+                        estado: actividad && 
+                               new Date() - new Date(actividad.ultima_actividad) < 24 * 60 * 60 * 1000 
+                               ? 'Activo' : 'Inactivo'
+                    };
+                });
+                break;
+
+            case 'ubicaciones':
+                console.log('📍 Generando reporte de ubicaciones desde auditoría...');
                 
-                const tiposAlerta = ['Geofence', 'Batería Baja', 'Sin Señal', 'Movimiento Extraño'];
-                const prioridades = ['Alta', 'Media', 'Baja'];
-                
-                for (let i = 0; i < reportData.total; i++) {
-                    reportData.alertas.push({
-                        timestamp: new Date(Date.now() - Math.random() * 86400000),
-                        tipo: tiposAlerta[Math.floor(Math.random() * tiposAlerta.length)],
-                        prioridad: prioridades[Math.floor(Math.random() * prioridades.length)],
-                        mensaje: `Alerta automática #${i + 1}`,
-                        dispositivo: `CHIP-${(i + 1).toString().padStart(3, '0')}`,
-                        estado: Math.random() > 0.3 ? 'Resuelto' : 'Pendiente'
-                    });
-                }
+                const ubicacionesAuditoria = await Auditoria.find({
+                    ...filtrosAuditoria,
+                    $or: [
+                        { entidad: 'ubicacion' },
+                        { accion: 'GPS_UPDATE' },
+                        { categoria: 'gps' }
+                    ]
+                })
+                .sort({ timestamp: -1 })
+                .limit(100)
+                .lean();
+
+                reportData.total = ubicacionesAuditoria.length;
+                reportData.ubicaciones = ubicacionesAuditoria.map(reg => ({
+                    timestamp: reg.timestamp,
+                    mascota: reg.objetivo?.nombre || 'Dispositivo',
+                    latitud: reg.objetivo?.detalles?.latitud || 
+                             reg.cambios?.nuevo?.latitude || 
+                             reg.cambios?.nuevo?.latitud || 'N/A',
+                    longitud: reg.objetivo?.detalles?.longitud || 
+                              reg.cambios?.nuevo?.longitude || 
+                              reg.cambios?.nuevo?.longitud || 'N/A',
+                    precision: reg.objetivo?.detalles?.precision || 
+                               reg.cambios?.nuevo?.accuracy || 
+                               reg.cambios?.nuevo?.precision || 'N/A',
+                    metodo: reg.metadata?.metodo || 'GPS',
+                    tiempo_procesamiento: reg.metadata?.tiempoEjecucion || 0,
+                    exitoso: reg.metadata?.exitoso !== false
+                }));
                 break;
 
             case 'estadisticas':
-                console.log('📊 Generando reporte de estadísticas...');
+                console.log('📊 Generando estadísticas avanzadas desde auditoría...');
                 
-                // Estadísticas básicas sin agregaciones complejas
-                const [usuarios, mascotasCount] = await Promise.all([
+                const estadisticasAuditoria = await Auditoria.aggregate([
+                    { $match: filtrosAuditoria },
+                    {
+                        $group: {
+                            _id: null,
+                            total_operaciones: { $sum: 1 },
+                            operaciones_exitosas: {
+                                $sum: { $cond: [{ $ne: ['$metadata.exitoso', false] }, 1, 0] }
+                            },
+                            usuarios_activos: { $addToSet: '$actor.id' },
+                            entidades_afectadas: { $addToSet: '$entidad' },
+                            tiempo_promedio: { $avg: '$metadata.tiempoEjecucion' },
+                            operaciones_por_tipo: {
+                                $push: '$accion'
+                            }
+                        }
+                    }
+                ]);
+
+                const [totalUsuarios, totalMascotas] = await Promise.all([
                     Usuario.countDocuments(),
                     Mascota.countDocuments()
                 ]);
+
+                const stats = estadisticasAuditoria[0] || {};
                 
-                reportData.total = 4;
+                reportData.total = 6;
                 reportData.estadisticas = [
-                    { categoria: 'Usuarios Totales', valor: usuarios },
-                    { categoria: 'Mascotas Totales', valor: mascotasCount },
-                    { categoria: 'Dispositivos Activos', valor: Math.floor(mascotasCount * 0.8) },
-                    { categoria: 'Promedio Mascotas/Usuario', valor: mascotasCount > 0 ? (mascotasCount / Math.max(usuarios, 1)).toFixed(1) : '0' }
+                    { 
+                        categoria: 'Total Operaciones', 
+                        valor: stats.total_operaciones || 0,
+                        descripcion: 'Operaciones registradas en auditoría'
+                    },
+                    { 
+                        categoria: 'Tasa de Éxito', 
+                        valor: stats.total_operaciones > 0 
+                            ? ((stats.operaciones_exitosas / stats.total_operaciones) * 100).toFixed(1) + '%'
+                            : '100%',
+                        descripcion: 'Porcentaje de operaciones exitosas'
+                    },
+                    { 
+                        categoria: 'Usuarios Activos', 
+                        valor: stats.usuarios_activos?.length || 0,
+                        descripcion: 'Usuarios con actividad registrada'
+                    },
+                    { 
+                        categoria: 'Tiempo Promedio', 
+                        valor: stats.tiempo_promedio ? stats.tiempo_promedio.toFixed(2) + 'ms' : 'N/A',
+                        descripcion: 'Tiempo promedio de procesamiento'
+                    },
+                    { 
+                        categoria: 'Usuarios Totales', 
+                        valor: totalUsuarios,
+                        descripcion: 'Total de usuarios registrados'
+                    },
+                    { 
+                        categoria: 'Mascotas Totales', 
+                        valor: totalMascotas,
+                        descripción: 'Total de mascotas registradas'
+                    }
                 ];
                 break;
 
             case 'mascotas':
-                console.log('🐕 Generando reporte de mascotas...');
+                console.log('🐕 Generando reporte de mascotas con actividad...');
                 
+                const mascotasConActividad = await Auditoria.aggregate([
+                    {
+                        $match: {
+                            ...filtrosAuditoria,
+                            entidad: 'mascota'
+                        }
+                    },
+                    {
+                        $group: {
+                            _id: '$objetivo.id',
+                            nombre: { $first: '$objetivo.nombre' },
+                            operaciones: { $sum: 1 },
+                            ultima_actividad: { $max: '$timestamp' },
+                            tipos_operacion: { $addToSet: '$accion' }
+                        }
+                    }
+                ]);
+
                 const mascotasReporte = await Mascota.find({})
                     .populate('propietario', 'nombre email')
                     .sort({ createdAt: -1 })
                     .limit(50);
 
                 reportData.total = mascotasReporte.length;
-                reportData.mascotas = mascotasReporte.map(mascota => ({
-                    _id: mascota._id,
-                    nombre: mascota.nombre,
-                    especie: mascota.especie,
-                    raza: mascota.raza,
-                    edad: mascota.edad,
-                    propietario: mascota.propietario?.nombre || 'N/A',
-                    email: mascota.propietario?.email || 'N/A',
-                    createdAt: mascota.createdAt
-                }));
+                reportData.mascotas = mascotasReporte.map(mascota => {
+                    const actividad = mascotasConActividad.find(
+                        act => act._id?.toString() === mascota._id.toString()
+                    );
+                    
+                    return {
+                        _id: mascota._id,
+                        nombre: mascota.nombre,
+                        especie: mascota.especie,
+                        raza: mascota.raza,
+                        edad: mascota.edad,
+                        propietario: mascota.propietario?.nombre || 'N/A',
+                        email: mascota.propietario?.email || 'N/A',
+                        createdAt: mascota.createdAt,
+                        actividad_total: actividad?.operaciones || 0,
+                        ultima_actividad: actividad?.ultima_actividad || mascota.createdAt
+                    };
+                });
                 break;
 
             default:
                 return res.status(400).json({
                     error: 'Tipo de reporte no válido',
-                    message: 'Use: dispositivos, ubicaciones, alertas, estadisticas, mascotas',
+                    message: 'Use: auditoria, actividad, dispositivos, ubicaciones, estadisticas, mascotas',
                     total: 0
                 });
         }
@@ -462,11 +634,11 @@ reportesController.generateReport = async (req, res) => {
         const processingTime = Date.now() - startTime;
         reportData.processingTime = processingTime;
         
-        console.log(`✅ Reporte generado exitosamente: ${tipoReporte}, Total: ${reportData.total} registros, Tiempo: ${processingTime}ms`);
+        console.log(`✅ Reporte generado desde auditoría: ${tipoReporte}, Total: ${reportData.total} registros, Tiempo: ${processingTime}ms`);
         res.json(reportData);
 
     } catch (error) {
-        console.error('❌ Error generando reporte:', error);
+        console.error('❌ Error generando reporte desde auditoría:', error);
         res.status(500).json({ 
             error: 'Error al generar reporte', 
             message: error.message,
@@ -478,146 +650,758 @@ reportesController.generateReport = async (req, res) => {
 /**
  * 📄 Exportar reporte a PDF
  * 
- * @description Genera reporte en formato PDF con datos reales del sistema
+ * @description Genera reporte en formato PDF real usando PDFKit con los mismos datos que Excel
  * @route POST /api/admin/export-pdf
  * @access Admin
  * 
- * @input {Object} req.body - Filtros del reporte
- * @input {Object} req.body.filters - Filtros específicos
- * @input {string} req.body.filters.tipoReporte - Tipo de reporte
- * @input {string} req.body.filters.fechaInicio - Fecha de inicio
- * @input {string} req.body.filters.fechaFin - Fecha de fin
+ * @input {Array<Object>} data - Array de registros con claves dinámicas (igual que Excel)
+ * @input {string} tipo - Tipo de reporte a generar (igual que Excel)
+ * @input {string} [fechaInicio] - Filtro fecha inicio (opcional)
+ * @input {string} [fechaFin] - Filtro fecha fin (opcional)
+ * @input {string} [usuario] - Filtro por usuario (opcional)
+ * @input {string} [mascota] - Filtro por mascota (opcional)
  * 
- * @output {Object} 200 - Contenido del reporte en texto plano
- * @output {Object} 400 - Filtros inválidos
+ * @output {File} 200 - Archivo PDF generado
+ * @output {Object} 400 - Parámetros inválidos
  * @output {Object} 500 - Error interno del servidor
  */
 reportesController.exportPDF = async (req, res) => {
     try {
-        const { filters } = req.body;
+        const { data, tipo, fechaInicio, fechaFin, mascota } = req.body;
         
-        if (!filters || !filters.tipoReporte) {
-            return res.status(400).json({ 
-                message: 'Filtros requeridos: tipoReporte es obligatorio' 
+        console.log('📄 Generando PDF real usando PDFKit con la misma lógica que Excel...');
+        console.log('📋 Datos recibidos:', {
+            dataLength: data?.length,
+            tipo,
+            fechaInicio,
+            fechaFin,
+            mascota
+        });
+        
+        // Validar parámetros básicos (igual que Excel)
+        if (!Array.isArray(data) || data.length === 0 || !tipo) {
+            return res.status(400).json({
+                message: 'Parámetros requeridos: data (Array) y tipo (string)'
             });
         }
-
-        const { tipoReporte, fechaInicio, fechaFin, mascotaId } = filters;
-        console.log('📄 Generando reporte PDF con datos reales...', filters);
         
-        // Crear filtros de fecha si están presentes
-        let fechaInicioObj, fechaFinObj;
+        // Filtrar datos por fecha si se proveen (MISMA LÓGICA QUE EXCEL)
+        let filtered = data;
         if (fechaInicio && fechaFin) {
-            fechaInicioObj = new Date(fechaInicio + 'T00:00:00.000Z');
-            fechaFinObj = new Date(fechaFin + 'T23:59:59.999Z');
-        }
-
-        let reportContent = `
-REPORTE ONICHIP IoT - ${tipoReporte.toUpperCase()}
-${'='.repeat(50)}
-Fecha de generación: ${new Date().toLocaleString('es-ES')}
-${fechaInicio && fechaFin ? `Período: ${fechaInicio} al ${fechaFin}` : 'Sin filtro de fechas'}
-${'='.repeat(50)}
-
-`;
-
-        switch (tipoReporte) {
-            case 'dispositivos':
-                const filtroMascotas = fechaInicioObj && fechaFinObj ? 
-                    { createdAt: { $gte: fechaInicioObj, $lte: fechaFinObj } } : {};
-                
-                if (mascotaId) {
-                    filtroMascotas._id = mascotaId;
+            console.log('🔍 Debug fechas recibidas para PDF:', { fechaInicio, fechaFin });
+            
+            const start = new Date(fechaInicio);
+            const end = new Date(fechaFin);
+            
+            if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+                console.error('❌ Fechas inválidas recibidas para PDF:', { fechaInicio, fechaFin });
+                return res.status(400).json({
+                    message: 'Formato de fecha inválido. Use formato ISO: YYYY-MM-DD'
+                });
+            }
+            
+            filtered = filtered.filter(item => {
+                const itemDate = new Date(item.timestamp || item.fecha || item.date || item.createdAt);
+                if (isNaN(itemDate.getTime())) {
+                    return true; // Incluir items sin fecha válida
                 }
-
-                const mascotas = await Mascota.find(filtroMascotas)
-                    .populate('propietario', 'nombre email')
-                    .limit(100);
-
-                reportContent += `DISPOSITIVOS REGISTRADOS:\n${'-'.repeat(30)}\n`;
-                
-                mascotas.forEach((mascota, index) => {
-                    const chipId = `CHIP-${String(index + 1).padStart(3, '0')}`;
-                    const estado = Math.random() > 0.2 ? 'Activo' : 'Inactivo';
-                    const bateria = Math.floor(Math.random() * (95 - 15) + 15);
-                    
-                    reportContent += `${index + 1}. ${chipId} | ${mascota.nombre} (${mascota.especie}) | Estado: ${estado} | Batería: ${bateria}%\n`;
-                    reportContent += `   Propietario: ${mascota.propietario?.nombre || 'N/A'} | Email: ${mascota.propietario?.email || 'N/A'}\n`;
-                    reportContent += `   Registrado: ${new Date(mascota.createdAt).toLocaleDateString('es-ES')}\n\n`;
-                });
-
-                const activos = Math.floor(mascotas.length * 0.8);
-                reportContent += `\nRESUMEN:\n${'-'.repeat(10)}\n`;
-                reportContent += `- Total de dispositivos: ${mascotas.length}\n`;
-                reportContent += `- Dispositivos activos: ${activos}\n`;
-                reportContent += `- Dispositivos inactivos: ${mascotas.length - activos}\n`;
-                break;
-
-            case 'ubicaciones':
-                const filtroUbicaciones = fechaInicioObj && fechaFinObj ? 
-                    { timestamp: { $gte: fechaInicioObj, $lte: fechaFinObj } } : {};
-
-                const ubicaciones = await Ubicacion.find(filtroUbicaciones)
-                    .populate('mascotaId', 'nombre especie')
-                    .sort({ timestamp: -1 })
-                    .limit(100);
-
-                reportContent += `HISTORIAL DE UBICACIONES:\n${'-'.repeat(30)}\n`;
-                
-                ubicaciones.forEach((ub, index) => {
-                    reportContent += `${index + 1}. ${new Date(ub.timestamp).toLocaleString('es-ES')}\n`;
-                    reportContent += `   Mascota: ${ub.mascotaId?.nombre || 'N/A'} (${ub.mascotaId?.especie || 'N/A'})\n`;
-                    reportContent += `   Coordenadas: ${ub.latitude || 'N/A'}, ${ub.longitude || 'N/A'}\n`;
-                    reportContent += `   Precisión: ${ub.accuracy || 'N/A'}m | Método: ${ub.method || 'GPS'}\n\n`;
-                });
-
-                reportContent += `\nRESUMEN:\n${'-'.repeat(10)}\n`;
-                reportContent += `- Total de ubicaciones registradas: ${ubicaciones.length}\n`;
-                reportContent += `- Período analizado: ${fechaInicio || 'Sin límite'} al ${fechaFin || 'Sin límite'}\n`;
-                break;
-
-            case 'estadisticas':
-                const [totalUsuarios, totalMascotas] = await Promise.all([
-                    Usuario.countDocuments(),
-                    Mascota.countDocuments()
-                ]);
-
-                const mascotasPorEspecie = await Mascota.aggregate([
-                    { $group: { _id: '$especie', count: { $sum: 1 } } },
-                    { $sort: { count: -1 } }
-                ]);
-
-                reportContent += `ESTADÍSTICAS GENERALES:\n${'-'.repeat(30)}\n`;
-                reportContent += `- Total de usuarios: ${totalUsuarios}\n`;
-                reportContent += `- Total de mascotas: ${totalMascotas}\n`;
-                reportContent += `- Promedio mascotas/usuario: ${totalUsuarios > 0 ? (totalMascotas / totalUsuarios).toFixed(2) : 0}\n\n`;
-                
-                reportContent += `DISTRIBUCIÓN POR ESPECIE:\n${'-'.repeat(25)}\n`;
-                mascotasPorEspecie.forEach(especie => {
-                    reportContent += `- ${especie._id}: ${especie.count} mascotas\n`;
-                });
-                break;
-
-            default:
-                return res.status(400).json({ 
-                    message: 'Tipo de reporte no válido para PDF' 
-                });
+                return itemDate >= start && itemDate <= end;
+            });
+            
+            console.log(`📊 Filtro de fecha aplicado en PDF: ${data.length} -> ${filtered.length} registros`);
         }
+        
+        // Filtrar por mascota (MISMA LÓGICA QUE EXCEL)
+        if (mascota) {
+            filtered = filtered.filter(item => item.mascota === mascota || item.pet === mascota);
+        }
+        
+        // Crear documento PDF
+        const doc = new PDFDocument({ 
+            margin: 50,
+            size: 'A4',
+            layout: 'landscape' // Usar orientación horizontal para tablas
+        });
+        
+        // Configurar headers de respuesta
+        const fileName = `reporte-${tipo}-${Date.now()}.pdf`;
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+        
+        // Pipe el PDF directamente a la respuesta
+        doc.pipe(res);
+        
+        // Título del documento
+        doc.fontSize(16)
+           .font('Helvetica-Bold')
+           .text(`REPORTE ONICHIP IoT - ${tipo.toUpperCase()}`, { align: 'center' });
+        
+        doc.moveDown();
+        
+        // Información del reporte
+        doc.fontSize(10)
+           .font('Helvetica')
+           .text(`Fecha de generación: ${new Date().toLocaleString('es-ES')}`)
+           .text(`Total de registros: ${filtered.length}`)
+           .text(`Tipo: ${tipo}`)
+           .text(fechaInicio && fechaFin ? `Período: ${fechaInicio} al ${fechaFin}` : 'Sin filtro de fechas');
+        
+        doc.moveDown();
+        
+        if (filtered.length === 0) {
+            doc.fontSize(12)
+               .text('No hay datos disponibles para mostrar en el reporte.', { align: 'center' });
+        } else {
+            // Obtener headers dinámicamente (igual que Excel)
+            const headers = Object.keys(filtered[0]);
+            const maxRows = Math.min(filtered.length, 50); // Limitar a 50 filas para PDF
+            
+            // Configurar tabla
+            const tableTop = doc.y + 20;
+            const tableLeft = 50;
+            const columnWidth = (doc.page.width - 100) / headers.length; // Distribuir columnas uniformemente
+            
+            // Dibujar encabezados
+            doc.fontSize(8)
+               .font('Helvetica-Bold');
+            
+            headers.forEach((header, i) => {
+                const x = tableLeft + (i * columnWidth);
+                doc.text(header.charAt(0).toUpperCase() + header.slice(1), x, tableTop, {
+                    width: columnWidth - 5,
+                    align: 'left'
+                });
+            });
+            
+            // Línea separadora después de encabezados
+            const headerBottom = tableTop + 15;
+            doc.moveTo(tableLeft, headerBottom)
+               .lineTo(tableLeft + (headers.length * columnWidth), headerBottom)
+               .stroke();
+            
+            // Dibujar filas de datos
+            doc.font('Helvetica')
+               .fontSize(7);
+            
+            for (let i = 0; i < maxRows; i++) {
+                const item = filtered[i];
+                const rowY = headerBottom + 5 + (i * 12);
+                
+                // Verificar si necesitamos una nueva página
+                if (rowY > doc.page.height - 100) {
+                    doc.addPage({ layout: 'landscape' });
+                    break;
+                }
+                
+                headers.forEach((header, j) => {
+                    const x = tableLeft + (j * columnWidth);
+                    let value = item[header];
+                    
+                    // Formatear valores
+                    if (value === null || value === undefined) {
+                        value = 'N/A';
+                    } else if (typeof value === 'object') {
+                        if (value instanceof Date) {
+                            value = value.toLocaleDateString('es-ES');
+                        } else {
+                            value = JSON.stringify(value);
+                        }
+                    } else if (typeof value === 'boolean') {
+                        value = value ? 'Sí' : 'No';
+                    } else {
+                        value = value.toString();
+                    }
+                    
+                    // Truncar valores muy largos
+                    if (value.length > 20) {
+                        value = value.substring(0, 17) + '...';
+                    }
+                    
+                    doc.text(value, x, rowY, {
+                        width: columnWidth - 5,
+                        align: 'left'
+                    });
+                });
+            }
+            
+            // Resumen al final
+            doc.moveDown(3)
+               .fontSize(10)
+               .font('Helvetica-Bold')
+               .text('RESUMEN DEL REPORTE:', { align: 'left' })
+               .font('Helvetica')
+               .text(`• Total de registros: ${filtered.length}`)
+               .text(`• Registros mostrados: ${maxRows}`)
+               .text(`• Tipo: ${tipo}`)
+               .text(`• Generado: ${new Date().toLocaleString('es-ES')}`);
+            
+            if (filtered.length > 50) {
+                doc.text('• Nota: Mostrando solo los primeros 50 registros para optimizar el PDF');
+            }
+        }
+        
+        // Finalizar el documento
+        doc.end();
+        
+        console.log(`✅ PDF real generado: ${fileName} con ${filtered.length} registros`);
 
-        reportContent += `\n${'='.repeat(50)}\nReporte generado por Onichip Admin Panel\n${'='.repeat(50)}`;
+    } catch (error) {
+        console.error('❌ Error generando PDF real:', error);
+        res.status(500).json({ 
+            message: 'Error al generar PDF real', 
+            error: error.message 
+        });
+    }
+};
 
-        console.log(`✅ Reporte PDF generado: ${tipoReporte}`);
+// ================================
+// 📊 NUEVAS FUNCIONES PARA DASHBOARD
+// ================================
+
+/**
+ * 📈 Obtener métricas en tiempo real para dashboard
+ * 
+ * @description Obtiene métricas clave basadas en auditoría para dashboard
+ * @route GET /api/admin/dashboard-metrics
+ * @access Admin
+ * 
+ * @output {Object} 200 - Métricas de dashboard en tiempo real
+ * @output {Object} 500 - Error interno del servidor
+ */
+reportesController.getDashboardMetrics = async (req, res) => {
+    try {
+        console.log('📈 Generando métricas de dashboard...');
+        const startTime = Date.now();
+
+        // Período para métricas (últimas 24 horas y última semana)
+        const hace24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const hace7d = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+        const metricas = await Promise.all([
+            // Métricas básicas últimas 24h
+            Auditoria.aggregate([
+                {
+                    $match: { 
+                        timestamp: { $gte: hace24h },
+                        'actor.id': { $exists: true }
+                    }
+                },
+                {
+                    $group: {
+                        _id: null,
+                        total_operaciones: { $sum: 1 },
+                        usuarios_activos: { 
+                            $addToSet: {
+                                $cond: [
+                                    { $ne: ['$actor.id', null] },
+                                    '$actor.id',
+                                    '$$REMOVE'
+                                ]
+                            }
+                        },
+                        operaciones_exitosas: {
+                            $sum: { $cond: [{ $ne: ['$metadata.exitoso', false] }, 1, 0] }
+                        },
+                        ubicaciones_gps: {
+                            $sum: { $cond: [{ $eq: ['$entidad', 'ubicacion'] }, 1, 0] }
+                        }
+                    }
+                }
+            ]),
+
+            // Actividad por hora (últimas 24h)
+            Auditoria.aggregate([
+                {
+                    $match: { 
+                        timestamp: { $gte: hace24h },
+                        'actor.id': { $exists: true }
+                    }
+                },
+                {
+                    $group: {
+                        _id: { $hour: '$timestamp' },
+                        operaciones: { $sum: 1 },
+                        usuarios_unicos: { 
+                            $addToSet: {
+                                $cond: [
+                                    { $ne: ['$actor.id', null] },
+                                    '$actor.id',
+                                    '$$REMOVE'
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    $addFields: {
+                        usuarios_count: { $size: '$usuarios_unicos' }
+                    }
+                },
+                { $sort: { '_id': 1 } }
+            ]),
+
+            // Top entidades más activas
+            Auditoria.aggregate([
+                {
+                    $match: { 
+                        timestamp: { $gte: hace7d },
+                        entidad: { $exists: true, $ne: null, $ne: '' }
+                    }
+                },
+                {
+                    $group: {
+                        _id: '$entidad',
+                        operaciones: { $sum: 1 },
+                        ultima_actividad: { $max: '$timestamp' }
+                    }
+                },
+                { $sort: { operaciones: -1 } },
+                { $limit: 5 }
+            ]),
+
+            // Estados de sistema (errores, warnings)
+            Auditoria.aggregate([
+                {
+                    $match: { 
+                        timestamp: { $gte: hace24h },
+                        severidad: { $exists: true }
+                    }
+                },
+                {
+                    $group: {
+                        _id: '$severidad',
+                        count: { $sum: 1 }
+                    }
+                }
+            ])
+        ]);
+
+        const metricas24h = metricas[0][0] || {};
+        const actividadPorHora = metricas[1];
+        const topEntidades = metricas[2];
+        const estadosSistema = metricas[3];
+
+        const processingTime = Date.now() - startTime;
+
+        console.log(`✅ Métricas de dashboard generadas en ${processingTime}ms`);
         res.json({
-            success: true,
-            contentType: 'text/plain',
-            content: reportContent,
-            filename: `reporte-onichip-${tipoReporte}-${Date.now()}.txt`
+            resumen: {
+                operaciones_24h: metricas24h.total_operaciones || 0,
+                usuarios_activos_24h: metricas24h.usuarios_activos?.length || 0,
+                tasa_exito: metricas24h.total_operaciones > 0 
+                    ? ((metricas24h.operaciones_exitosas / metricas24h.total_operaciones) * 100).toFixed(1)
+                    : '100',
+                ubicaciones_gps_24h: metricas24h.ubicaciones_gps || 0
+            },
+            graficos: {
+                actividad_por_hora: actividadPorHora,
+                top_entidades: topEntidades,
+                estados_sistema: estadosSistema
+            },
+            timestamp: new Date().toISOString(),
+            processingTime
         });
 
     } catch (error) {
-        console.error('❌ Error generando reporte PDF:', error);
+        console.error('❌ Error generando métricas de dashboard:', error);
         res.status(500).json({ 
-            message: 'Error al generar reporte PDF', 
+            message: 'Error al obtener métricas de dashboard',
+            error: error.message 
+        });
+    }
+};
+
+/**
+ * 📊 Obtener datos para gráficos específicos
+ * 
+ * @description Genera datos optimizados para gráficos específicos del dashboard
+ * @route POST /api/admin/chart-data
+ * @access Admin
+ * 
+ * @input {Object} req.body - Parámetros del gráfico
+ * @input {string} req.body.tipoGrafico - Tipo de gráfico (timeline/pie/bar/heatmap)
+ * @input {string} req.body.metrica - Métrica a graficar
+ * @input {number} req.body.periodo - Período en días (opcional, default: 7)
+ * 
+ * @output {Object} 200 - Datos formateados para gráficos
+ * @output {Object} 400 - Parámetros inválidos
+ * @output {Object} 500 - Error interno del servidor
+ */
+reportesController.getChartData = async (req, res) => {
+    try {
+        const { tipoGrafico, metrica, periodo = 7 } = req.body;
+        console.log('📊 Generando datos para gráfico:', { tipoGrafico, metrica, periodo });
+
+        if (!tipoGrafico || !metrica) {
+            return res.status(400).json({ 
+                message: 'tipoGrafico y metrica son requeridos' 
+            });
+        }
+
+        const fechaInicio = new Date(Date.now() - periodo * 24 * 60 * 60 * 1000);
+        let chartData = {};
+
+        switch (tipoGrafico) {
+            case 'timeline':
+                if (metrica === 'actividad_diaria') {
+                    chartData = await Auditoria.aggregate([
+                        {
+                            $match: { 
+                                timestamp: { $gte: fechaInicio },
+                                'actor.id': { $exists: true }
+                            }
+                        },
+                        {
+                            $group: {
+                                _id: {
+                                    fecha: { $dateToString: { format: '%Y-%m-%d', date: '$timestamp' } }
+                                },
+                                operaciones: { $sum: 1 },
+                                usuarios: { 
+                                    $addToSet: {
+                                        $cond: [
+                                            { $ne: ['$actor.id', null] },
+                                            '$actor.id',
+                                            '$$REMOVE'
+                                        ]
+                                    }
+                                },
+                                errores: {
+                                    $sum: { $cond: [{ $eq: ['$metadata.exitoso', false] }, 1, 0] }
+                                }
+                            }
+                        },
+                        {
+                            $addFields: {
+                                usuarios_count: { $size: '$usuarios' }
+                            }
+                        },
+                        { $sort: { '_id.fecha': 1 } }
+                    ]);
+                }
+                break;
+
+            case 'pie':
+                if (metrica === 'operaciones_por_entidad') {
+                    chartData = await Auditoria.aggregate([
+                        {
+                            $match: { 
+                                timestamp: { $gte: fechaInicio },
+                                entidad: { $exists: true, $ne: null, $ne: '' }
+                            }
+                        },
+                        {
+                            $group: {
+                                _id: '$entidad',
+                                value: { $sum: 1 }
+                            }
+                        },
+                        { $sort: { value: -1 } }
+                    ]);
+                } else if (metrica === 'usuarios_por_tipo') {
+                    chartData = await Auditoria.aggregate([
+                        {
+                            $match: { 
+                                timestamp: { $gte: fechaInicio },
+                                'actor.tipo': { $exists: true, $ne: null }
+                            }
+                        },
+                        {
+                            $group: {
+                                _id: '$actor.tipo',
+                                value: { $sum: 1 }
+                            }
+                        }
+                    ]);
+                }
+                break;
+
+            case 'bar':
+                if (metrica === 'top_usuarios_activos') {
+                    chartData = await Auditoria.aggregate([
+                        {
+                            $match: { 
+                                timestamp: { $gte: fechaInicio },
+                                'actor.tipo': 'usuario',
+                                'actor.id': { $exists: true, $ne: null },
+                                'actor.nombre': { $exists: true, $ne: null, $ne: '' }
+                            }
+                        },
+                        {
+                            $group: {
+                                _id: '$actor.id',
+                                nombre: { $first: '$actor.nombre' },
+                                operaciones: { $sum: 1 },
+                                ultima_actividad: { $max: '$timestamp' }
+                            }
+                        },
+                        { $sort: { operaciones: -1 } },
+                        { $limit: 10 }
+                    ]);
+                }
+                break;
+
+            case 'heatmap':
+                if (metrica === 'actividad_por_hora_dia') {
+                    chartData = await Auditoria.aggregate([
+                        {
+                            $match: { 
+                                timestamp: { $gte: fechaInicio }
+                            }
+                        },
+                        {
+                            $group: {
+                                _id: {
+                                    dia: { $dayOfWeek: '$timestamp' },
+                                    hora: { $hour: '$timestamp' }
+                                },
+                                intensidad: { $sum: 1 }
+                            }
+                        },
+                        { $sort: { '_id.dia': 1, '_id.hora': 1 } }
+                    ]);
+                }
+                break;
+
+            default:
+                return res.status(400).json({
+                    message: 'Tipo de gráfico no válido',
+                    tipos_validos: ['timeline', 'pie', 'bar', 'heatmap']
+                });
+        }
+
+        console.log(`✅ Datos de gráfico generados: ${tipoGrafico} - ${metrica}`);
+        res.json({
+            tipo: tipoGrafico,
+            metrica,
+            periodo,
+            data: chartData,
+            timestamp: new Date().toISOString()
+        });
+
+    } catch (error) {
+        console.error('❌ Error generando datos de gráfico:', error);
+        res.status(500).json({ 
+            message: 'Error al generar datos de gráfico',
+            error: error.message 
+        });
+    }
+};
+
+/**
+ * 🔥 Obtener alertas y eventos críticos
+ * 
+ * @description Obtiene eventos críticos y alertas basados en auditoría
+ * @route GET /api/admin/critical-events
+ * @access Admin
+ * 
+ * @output {Object} 200 - Eventos críticos del sistema
+ * @output {Object} 500 - Error interno del servidor
+ */
+reportesController.getCriticalEvents = async (req, res) => {
+    try {
+        console.log('🔥 Obteniendo eventos críticos...');
+        const startTime = Date.now();
+
+        const hace24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+        const eventos = await Promise.all([
+            // Errores críticos recientes
+            Auditoria.find({
+                timestamp: { $gte: hace24h },
+                $or: [
+                    { severidad: 'critical' },
+                    { severidad: 'error' },
+                    { 'metadata.exitoso': false }
+                ]
+            })
+            .sort({ timestamp: -1 })
+            .limit(20)
+            .lean(),
+
+            // Patrones anómalos de actividad
+            Auditoria.aggregate([
+                {
+                    $match: { timestamp: { $gte: hace24h } }
+                },
+                {
+                    $group: {
+                        _id: '$actor.id',
+                        operaciones: { $sum: 1 },
+                        nombre: { $first: '$actor.nombre' },
+                        tipo: { $first: '$actor.tipo' }
+                    }
+                },
+                {
+                    $match: { operaciones: { $gt: 100 } } // Actividad sospechosa
+                },
+                { $sort: { operaciones: -1 } },
+                { $limit: 10 }
+            ]),
+
+            // Dispositivos sin actividad reciente
+            Auditoria.aggregate([
+                {
+                    $match: {
+                        entidad: 'ubicacion',
+                        timestamp: { $lt: new Date(Date.now() - 6 * 60 * 60 * 1000) } // Sin GPS por 6h
+                    }
+                },
+                {
+                    $group: {
+                        _id: '$objetivo.id',
+                        nombre: { $first: '$objetivo.nombre' },
+                        ultima_ubicacion: { $max: '$timestamp' }
+                    }
+                },
+                { $sort: { ultima_ubicacion: 1 } },
+                { $limit: 5 }
+            ])
+        ]);
+
+        const processingTime = Date.now() - startTime;
+
+        console.log(`✅ Eventos críticos obtenidos en ${processingTime}ms`);
+        res.json({
+            errores_criticos: eventos[0],
+            actividad_anomala: eventos[1],
+            dispositivos_sin_gps: eventos[2],
+            resumen: {
+                total_errores: eventos[0].length,
+                usuarios_actividad_alta: eventos[1].length,
+                dispositivos_inactivos: eventos[2].length
+            },
+            timestamp: new Date().toISOString(),
+            processingTime
+        });
+
+    } catch (error) {
+        console.error('❌ Error obteniendo eventos críticos:', error);
+        res.status(500).json({ 
+            message: 'Error al obtener eventos críticos',
+            error: error.message 
+        });
+    }
+};
+
+/**
+ * 📋 Obtener estadísticas de rendimiento del sistema
+ * 
+ * @description Genera métricas de rendimiento basadas en auditoría
+ * @route GET /api/admin/performance-stats
+ * @access Admin
+ * 
+ * @output {Object} 200 - Estadísticas de rendimiento
+ * @output {Object} 500 - Error interno del servidor
+ */
+reportesController.getPerformanceStats = async (req, res) => {
+    try {
+        console.log('📋 Generando estadísticas de rendimiento...');
+        const startTime = Date.now();
+
+        const hace24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const hace7d = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+        const stats = await Promise.all([
+            // Tiempos de respuesta promedio por endpoint
+            Auditoria.aggregate([
+                {
+                    $match: { 
+                        timestamp: { $gte: hace24h },
+                        'metadata.tiempoEjecucion': { $exists: true, $gt: 0 },
+                        'metadata.endpoint': { $exists: true, $ne: null, $ne: '' }
+                    }
+                },
+                {
+                    $group: {
+                        _id: '$metadata.endpoint',
+                        tiempo_promedio: { $avg: '$metadata.tiempoEjecucion' },
+                        tiempo_maximo: { $max: '$metadata.tiempoEjecucion' },
+                        tiempo_minimo: { $min: '$metadata.tiempoEjecucion' },
+                        total_requests: { $sum: 1 }
+                    }
+                },
+                { $sort: { tiempo_promedio: -1 } },
+                { $limit: 10 }
+            ]),
+
+            // Carga del sistema por hora
+            Auditoria.aggregate([
+                {
+                    $match: { timestamp: { $gte: hace24h } }
+                },
+                {
+                    $group: {
+                        _id: { $hour: '$timestamp' },
+                        operaciones_por_hora: { $sum: 1 },
+                        tiempo_promedio: { 
+                            $avg: {
+                                $cond: [
+                                    { $and: [
+                                        { $ne: ['$metadata.tiempoEjecucion', null] },
+                                        { $gt: ['$metadata.tiempoEjecucion', 0] }
+                                    ]},
+                                    '$metadata.tiempoEjecucion',
+                                    null
+                                ]
+                            }
+                        }
+                    }
+                },
+                { $sort: { '_id': 1 } }
+            ]),
+
+            // Comparación semanal
+            Auditoria.aggregate([
+                {
+                    $match: { timestamp: { $gte: hace7d } }
+                },
+                {
+                    $group: {
+                        _id: {
+                            $dateToString: { format: '%Y-%m-%d', date: '$timestamp' }
+                        },
+                        operaciones: { $sum: 1 },
+                        tiempo_promedio: { 
+                            $avg: {
+                                $cond: [
+                                    { $and: [
+                                        { $ne: ['$metadata.tiempoEjecucion', null] },
+                                        { $gt: ['$metadata.tiempoEjecucion', 0] }
+                                    ]},
+                                    '$metadata.tiempoEjecucion',
+                                    null
+                                ]
+                            }
+                        },
+                        errores: {
+                            $sum: { $cond: [{ $eq: ['$metadata.exitoso', false] }, 1, 0] }
+                        }
+                    }
+                },
+                { $sort: { '_id': -1 } },
+                { $limit: 7 }
+            ])
+        ]);
+
+        const processingTime = Date.now() - startTime;
+
+        console.log(`✅ Estadísticas de rendimiento generadas en ${processingTime}ms`);
+        res.json({
+            endpoints_mas_lentos: stats[0],
+            carga_por_hora: stats[1],
+            tendencia_semanal: stats[2],
+            metadata: {
+                periodo_analizado: '24 horas',
+                timestamp: new Date().toISOString(),
+                processingTime
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Error generando estadísticas de rendimiento:', error);
+        res.status(500).json({ 
+            message: 'Error al generar estadísticas de rendimiento',
             error: error.message 
         });
     }
