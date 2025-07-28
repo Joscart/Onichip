@@ -49,7 +49,7 @@ export interface Geofence {
   providedIn: 'root'
 })
 export class GpsService {
-  private apiUrl = 'http://18.223.160.105:3000/api';
+  private apiUrl = 'http://localhost:3000/api';
   
   // Estado reactivo de ubicaciones
   private currentLocationsSubject = new BehaviorSubject<LocationData[]>([]);

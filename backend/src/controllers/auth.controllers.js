@@ -77,24 +77,45 @@ authController.createAdmin = async (req, res) => {
  */
 authController.login = async (req, res) => {
   const { email, password } = req.body;
+  console.log('🔑 Login attempt:', { email, passwordLength: password?.length });
+  
   if (!email || !password) return res.status(400).json({ message: 'Email y contraseña requeridos' });
+  
   try {
     if (email.endsWith('@onichip.com')) {
       // Admin login
+      console.log('👨‍💼 Admin login attempt for:', email);
       const admin = await Admin.findOne({ email });
+      console.log('👨‍💼 Admin found:', admin ? 'YES' : 'NO');
       if (!admin) return res.status(401).json({ message: 'Admin no encontrado' });
+      
       const match = await bcrypt.compare(password, admin.password);
+      console.log('🔐 Password match for admin:', match);
       if (!match) return res.status(401).json({ message: 'Contraseña incorrecta' });
+      
       return res.json({ tipo: 'admin', admin: { id: admin._id, email: admin.email, nombre: admin.nombre, rol: admin.rol } });
     } else {
       // Usuario login
+      console.log('👤 User login attempt for:', email);
       const user = await Usuario.findOne({ email });
+      console.log('👤 User found:', user ? 'YES' : 'NO');
+      console.log('👤 User details:', user ? { id: user._id, email: user.email, nombre: user.nombre } : 'N/A');
+      
       if (!user) return res.status(401).json({ message: 'Usuario no encontrado' });
+      
+      console.log('🔐 Comparing passwords...');
+      console.log('🔐 Input password length:', password.length);
+      console.log('🔐 Stored hash length:', user.password?.length);
+      
       const match = await bcrypt.compare(password, user.password);
+      console.log('🔐 Password match for user:', match);
+      
       if (!match) return res.status(401).json({ message: 'Contraseña incorrecta' });
+      
       return res.json({ tipo: 'usuario', usuario: { id: user._id, email: user.email, nombre: user.nombre } });
     }
   } catch (err) {
+    console.error('❌ Login error:', err);
     res.status(500).json({ message: 'Error en login', error: err.message });
   }
 };
