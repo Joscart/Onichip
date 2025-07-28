@@ -110,10 +110,53 @@ mascotaController.getMascotasByOwner = async (req, res) => {
  */
 mascotaController.addMascota = async (req, res) => {
     try {
+        console.log('📝 Datos recibidos para nueva mascota:', JSON.stringify(req.body, null, 2));
+        
+        // Validar campos requeridos
+        const { nombre, especie, propietario, deviceId } = req.body;
+        if (!nombre || !especie || !propietario || !deviceId) {
+            const missing = [];
+            if (!nombre) missing.push('nombre');
+            if (!especie) missing.push('especie');
+            if (!propietario) missing.push('propietario');
+            if (!deviceId) missing.push('deviceId');
+            
+            console.log('❌ Campos faltantes:', missing);
+            return res.status(400).json({ 
+                message: `Campos requeridos faltantes: ${missing.join(', ')}`,
+                missing: missing
+            });
+        }
+        
         const mascota = new Mascota(req.body);
         await mascota.save();
+        
+        console.log('✅ Mascota creada exitosamente:', mascota.nombre, 'ID:', mascota._id);
         res.json({ message: 'Mascota agregada exitosamente', mascota });
     } catch (err) {
+        console.error('❌ Error al crear mascota:', err);
+        
+        // Manejo específico de errores de validación
+        if (err.name === 'ValidationError') {
+            const errors = Object.keys(err.errors).map(key => ({
+                field: key,
+                message: err.errors[key].message
+            }));
+            return res.status(400).json({ 
+                message: 'Error de validación', 
+                errors: errors,
+                details: err.message 
+            });
+        }
+        
+        // Error de duplicado (deviceId único)
+        if (err.code === 11000) {
+            return res.status(400).json({ 
+                message: 'El deviceId ya existe. Debe ser único.',
+                error: 'DUPLICATE_DEVICE_ID'
+            });
+        }
+        
         res.status(400).json({ message: 'Error al agregar mascota', error: err.message });
     }
 };
@@ -121,15 +164,50 @@ mascotaController.addMascota = async (req, res) => {
 // PUT actualizar mascota por deviceId (acepta JSON del firmware)
 mascotaController.editMascota = async (req, res) => {
     const { deviceId } = req.params;
+    console.log('🔄 Intentando actualizar mascota con deviceId:', deviceId);
+    console.log('📝 Datos a actualizar:', JSON.stringify(req.body, null, 2));
+    
     try {
+        // Primero verificar si existe la mascota
+        const existingMascota = await Mascota.findOne({ deviceId });
+        console.log('🔍 Mascota encontrada:', existingMascota ? `Sí (${existingMascota.nombre})` : 'No encontrada');
+        
+        if (!existingMascota) {
+            console.log('❌ No se pudo actualizar - mascota no encontrada con deviceId:', deviceId);
+            return res.status(404).json({ message: 'Mascota no encontrada con el deviceId proporcionado' });
+        }
+        
+        // Si se está actualizando el deviceId, verificar que no exista otro con el mismo ID
+        if (req.body.deviceId && req.body.deviceId !== deviceId) {
+            const duplicateMascota = await Mascota.findOne({ deviceId: req.body.deviceId });
+            if (duplicateMascota) {
+                console.log('❌ DeviceId duplicado:', req.body.deviceId);
+                return res.status(400).json({ 
+                    message: `El deviceId "${req.body.deviceId}" ya existe. Debe ser único.`,
+                    error: 'DUPLICATE_DEVICE_ID'
+                });
+            }
+        }
+        
         const updated = await Mascota.findOneAndUpdate(
             { deviceId },
             { $set: req.body },
             { new: true, upsert: false }
         );
-        if (!updated) return res.status(404).json({ message: 'Mascota no encontrada' });
+        
+        console.log('✅ Mascota actualizada exitosamente:', updated.nombre);
         res.json({ message: 'Mascota actualizada exitosamente', mascota: updated });
     } catch (err) {
+        console.error('❌ Error al actualizar mascota:', err);
+        
+        // Error de duplicado (deviceId único)
+        if (err.code === 11000) {
+            return res.status(400).json({ 
+                message: 'El nuevo deviceId ya existe. Debe ser único.',
+                error: 'DUPLICATE_DEVICE_ID'
+            });
+        }
+        
         res.status(400).json({ message: 'Error al actualizar mascota', error: err.message });
     }
 };

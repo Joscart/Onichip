@@ -618,20 +618,63 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
     const nuevoDeviceId = prompt('Ingrese el nuevo ID del dispositivo GPS:', mascota.dispositivo?.id || '');
     if (nuevoDeviceId === null) return;
     
-    const body = { deviceId: nuevoDeviceId };
-    this.loading = true;
+    // Validar que no esté vacío
+    if (!nuevoDeviceId || nuevoDeviceId.trim() === '') {
+      this.errorMsg = 'El ID del dispositivo no puede estar vacío.';
+      setTimeout(() => this.errorMsg = '', 3000);
+      return;
+    }
     
-    this.mascotasService.updateDeviceId(mascota._id, body).subscribe({
+    // Usar el deviceId actual de la mascota para buscarla en el backend
+    const currentDeviceId = mascota.deviceId || mascota.dispositivo?.id;
+    
+    if (!currentDeviceId) {
+      this.errorMsg = 'Error: No se encontró el ID actual del dispositivo.';
+      setTimeout(() => this.errorMsg = '', 3000);
+      return;
+    }
+    
+    // Validar que el nuevo ID sea diferente al actual
+    if (nuevoDeviceId.trim() === currentDeviceId) {
+      this.errorMsg = 'El nuevo ID debe ser diferente al actual.';
+      setTimeout(() => this.errorMsg = '', 3000);
+      return;
+    }
+    
+    const body = { 
+      deviceId: nuevoDeviceId.trim(),
+      'dispositivo.id': nuevoDeviceId.trim() 
+    };
+    this.loading = true;
+    this.errorMsg = ''; // Limpiar errores previos
+    
+    console.log('🔄 Actualizando dispositivo:', currentDeviceId, '->', nuevoDeviceId);
+    console.log('📝 Datos a enviar:', body);
+    
+    this.mascotasService.updateDeviceId(currentDeviceId, body).subscribe({
       next: () => {
         if (!mascota.dispositivo) mascota.dispositivo = {};
         mascota.dispositivo.id = nuevoDeviceId;
+        mascota.deviceId = nuevoDeviceId; // Actualizar también el deviceId principal
         this.successMsg = 'Dispositivo GPS asociado correctamente.';
         this.loading = false;
         this.refreshData();
       },
       error: (err) => {
-        this.errorMsg = err.error?.message || 'Error al asociar el dispositivo GPS.';
+        console.error('❌ Error al actualizar dispositivo:', err);
         this.loading = false;
+        
+        // Manejo específico para deviceId duplicado
+        if (err.error?.error === 'DUPLICATE_DEVICE_ID') {
+          this.errorMsg = `El ID "${nuevoDeviceId}" ya está en uso. Por favor, elija un ID diferente.`;
+        } else {
+          this.errorMsg = err.error?.message || 'Error al asociar el dispositivo GPS.';
+        }
+        
+        // Limpiar el mensaje de error después de 5 segundos
+        setTimeout(() => {
+          this.errorMsg = '';
+        }, 5000);
       }
     });
   }
