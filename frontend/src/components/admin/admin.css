@@ -97,11 +97,11 @@ body {
 }
 
 @keyframes pulse {
-  0%, 100% { 
+  0%, 100% {
     transform: scale(1);
     filter: drop-shadow(0 4px 12px rgba(124, 58, 237, 0.3));
   }
-  50% { 
+  50% {
     transform: scale(1.05);
     filter: drop-shadow(0 6px 16px rgba(124, 58, 237, 0.4));
   }
@@ -526,31 +526,31 @@ body {
   .login-container {
     padding: 1rem;
   }
-  
+
   .login-card {
     padding: 2rem;
   }
-  
+
   .admin-header {
     padding: 1rem;
     flex-direction: column;
     gap: 1rem;
   }
-  
+
   .admin-content {
     padding: 1.5rem;
   }
-  
+
   .stats-grid {
     grid-template-columns: 1fr;
     gap: 1.5rem;
   }
-  
+
   .stat-card {
     padding: 2rem;
     gap: 1.5rem;
   }
-  
+
   .nav-btn {
     padding: 1rem 1.5rem;
   }
@@ -560,15 +560,15 @@ body {
   .login-card {
     padding: 1.5rem;
   }
-  
+
   .login-header h2 {
     font-size: 1.5rem;
   }
-  
+
   .form-group input {
     padding: 0.875rem 1rem;
   }
-  
+
   .login-btn {
     padding: 0.875rem 1.5rem;
     font-size: 1rem;
@@ -1296,44 +1296,44 @@ body {
     align-items: flex-start;
     gap: 0.5rem;
   }
-  
+
   .export-options {
     flex-direction: column;
     gap: 0.5rem;
   }
-  
+
   .preview-header {
     flex-direction: column;
     gap: 1rem;
   }
-  
+
   .preview-info {
     flex-direction: column;
     gap: 0.5rem;
   }
-  
+
   .preview-footer {
     flex-direction: column;
     gap: 1rem;
   }
-  
+
   .alert-filters {
     flex-direction: column;
     align-items: stretch;
   }
-  
+
   .summary-grid {
     grid-template-columns: repeat(2, 1fr);
   }
-  
+
   .metrics-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .alerts-table {
     font-size: 0.8rem;
   }
-  
+
   .alerts-table th,
   .alerts-table td {
     padding: 0.5rem;
@@ -1344,12 +1344,12 @@ body {
   .summary-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .alert-actions {
     flex-direction: column;
     gap: 0.3rem;
   }
-  
+
   .action-btn {
     width: 100%;
     text-align: center;
@@ -1461,11 +1461,14 @@ body {
 
 .chart-container {
   background: #ffffff;
-  padding: 1rem;
+  padding: 1rem 1rem 1.5rem 1rem;
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(124, 58, 237, 0.08);
   border: 1px solid rgba(124, 58, 237, 0.1);
   transition: all 0.3s ease;
+  min-height: 320px;
+  display: flex;
+  flex-direction: column;
 }
 
 .chart-container:hover {
@@ -1479,11 +1482,14 @@ body {
   font-weight: 600;
   margin-bottom: 1rem;
   text-align: center;
+  flex-shrink: 0;
 }
 
 .chart-canvas {
   width: 100% !important;
-  height: 250px !important;
+  height: 280px !important;
+  max-height: 280px !important;
+  flex: 1;
 }
 
 .report-generator {
@@ -1622,20 +1628,20 @@ body {
     flex-direction: column;
     gap: 1rem;
   }
-  
+
   .admin-content {
     padding: 1.5rem;
   }
-  
+
   .stats-grid {
     grid-template-columns: 1fr;
     gap: 1rem;
   }
-  
+
   .stat-card {
     padding: 1.5rem;
   }
-  
+
   .modal-content {
     margin: 1rem;
     padding: 1.5rem;
@@ -1646,13 +1652,13 @@ body {
   .admin-content {
     padding: 1rem;
   }
-  
+
   .stat-card {
     padding: 1rem;
     flex-direction: column;
     text-align: center;
   }
-  
+
   .stat-card .emoji {
     font-size: 2rem;
     min-width: 60px;

@@ -136,39 +136,6 @@
         </div>
       </div>
 
-      <!-- Eventos recientes del sistema -->
-      <div class="alerts-section">
-        <h3><span class="emoji">�</span> Eventos Recientes del Sistema</h3>
-        <div class="alerts-grid">
-          <div *ngFor="let log of auditLogs.slice(0, 5)" class="alert alert-info">
-            <span class="emoji">📝</span>
-            <div class="alert-content">
-              <h4>{{ log.accion }}</h4>
-              <p>{{ log.actor_tipo }}: {{ log.actor_id }} - {{ log.fecha_hora | date:'short' }}</p>
-            </div>
-          </div>
-          <div *ngIf="auditLogs.length === 0" class="alert alert-success">
-            <span class="emoji">✅</span>
-            <div class="alert-content">
-              <h4>Sistema en calma</h4>
-              <p>No hay eventos recientes registrados</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Mascotas por especie -->
-      <div class="charts-section">
-        <h3><span class="emoji">📊</span> Distribución de Mascotas</h3>
-        <div class="species-grid">
-          <div *ngFor="let especie of getMascotasPorEspecie()" class="species-card">
-            <span class="emoji">{{ especie._id === 'Perro' ? '🐕' : especie._id === 'Gato' ? '🐱' : '🐾' }}</span>
-            <h4>{{ especie.count }}</h4>
-            <p>{{ especie._id }}</p>
-          </div>
-        </div>
-      </div>
-
       <!-- Métricas del sistema -->
       <div class="system-metrics">
         <h3><span class="emoji">⚡</span> Rendimiento del Sistema</h3>
@@ -182,7 +149,7 @@
             </div>
           </div>
           <div class="metric-card">
-            <span class="emoji">�</span>
+            <span class="emoji">📋</span>
             <div class="metric-info">
               <h4>{{ auditLogs.length }}</h4>
               <p>Eventos Totales</p>
@@ -212,14 +179,35 @@
 
           <!-- Gráfico de Barras -->
           <div class="chart-container">
-            <h4>Actividad Mensual de Dispositivos</h4>
+            <h4>Usuarios Activos por Horario</h4>
             <canvas #barChart class="chart-canvas"></canvas>
           </div>
 
           <!-- Gráfico de Líneas -->
           <div class="chart-container">
-            <h4>Dispositivos Activos por Horario</h4>
+            <h4>Actividad Mensual de Dispositivos</h4>
             <canvas #lineChart class="chart-canvas"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Eventos recientes del sistema - MOVIDO AL FINAL -->
+      <div class="alerts-section">
+        <h3><span class="emoji">📋</span> Eventos Recientes del Sistema</h3>
+        <div class="alerts-grid">
+          <div *ngFor="let log of auditLogs.slice(0, 5)" class="alert alert-info">
+            <span class="emoji">📝</span>
+            <div class="alert-content">
+              <h4>{{ log.accion }}</h4>
+              <p>{{ log.actor_tipo }}: {{ log.actor_id }} - {{ log.fecha_hora | date:'short' }}</p>
+            </div>
+          </div>
+          <div *ngIf="auditLogs.length === 0" class="alert alert-success">
+            <span class="emoji">✅</span>
+            <div class="alert-content">
+              <h4>Sistema en calma</h4>
+              <p>No hay eventos recientes registrados</p>
+            </div>
           </div>
         </div>
       </div>
@@ -438,99 +426,7 @@
       </div>
     </div>
 
-  </main>
-</div>
-
-<!-- 📝 MODAL USUARIO -->
-<div *ngIf="showUsuarioModal" class="modal-overlay" (click)="closeUsuarioModal()">
-  <div class="modal-content" (click)="$event.stopPropagation()">
-    <div class="modal-header">
-      <h3>{{ editingUsuario ? 'Editar Usuario' : 'Nuevo Usuario' }}</h3>
-      <button (click)="closeUsuarioModal()" class="close-btn">✕</button>
-    </div>
-
-    <form [formGroup]="usuarioForm" (ngSubmit)="saveUsuario()">
-      <div class="form-group">
-        <label>Nombre completo</label>
-        <input type="text" formControlName="nombre" placeholder="Juan Pérez">
-      </div>
-
-      <div class="form-group">
-        <label>Email</label>
-        <input type="email" formControlName="email" placeholder="usuario@email.com">
-      </div>
-
-      <div class="form-group">
-        <label>{{ editingUsuario ? 'Nueva contraseña (opcional)' : 'Contraseña' }}</label>
-        <input type="password" formControlName="password" placeholder="••••••">
-      </div>
-
-      <div class="form-group">
-        <label>Teléfono</label>
-        <input type="tel" formControlName="telefono" placeholder="+1234567890">
-      </div>
-
-      <div class="modal-actions">
-        <button type="button" (click)="closeUsuarioModal()" class="secondary-btn">Cancelar</button>
-        <button type="submit" [disabled]="usuarioForm.invalid || loading" class="primary-btn">
-          {{ loading ? 'Guardando...' : 'Guardar' }}
-        </button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- 📝 MODAL MASCOTA -->
-<div *ngIf="showMascotaModal" class="modal-overlay" (click)="closeMascotaModal()">
-  <div class="modal-content" (click)="$event.stopPropagation()">
-    <div class="modal-header">
-      <h3>{{ editingMascota ? 'Editar Mascota' : 'Nueva Mascota' }}</h3>
-      <button (click)="closeMascotaModal()" class="close-btn">✕</button>
-    </div>
-
-    <form [formGroup]="mascotaForm" (ngSubmit)="saveMascota()">
-      <div class="form-group">
-        <label>Nombre de la mascota</label>
-        <input type="text" formControlName="nombre" placeholder="Firulais">
-      </div>
-
-      <div class="form-group">
-        <label>Especie</label>
-        <select formControlName="especie">
-          <option value="">Seleccionar especie</option>
-          <option value="Perro">Perro</option>
-          <option value="Gato">Gato</option>
-          <option value="Ave">Ave</option>
-          <option value="Otro">Otro</option>
-        </select>
-      </div>
-
-      <div class="form-group">
-        <label>Raza</label>
-        <input type="text" formControlName="raza" placeholder="Labrador">
-      </div>
-
-      <div class="form-group">
-        <label>Edad (años)</label>
-        <input type="number" formControlName="edad" min="0" max="30">
-      </div>
-
-      <div class="form-group">
-        <label>Propietario (ID)</label>
-        <input type="text" formControlName="propietario" placeholder="ID del usuario">
-      </div>
-
-      <div class="modal-actions">
-        <button type="button" (click)="closeMascotaModal()" class="secondary-btn">Cancelar</button>
-        <button type="submit" [disabled]="mascotaForm.invalid || loading" class="primary-btn">
-          {{ loading ? 'Guardando...' : 'Guardar' }}
-        </button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- 📋 SECCIÓN DE REPORTES -->
+    <!-- 📋 SECCIÓN DE REPORTES -->
 <div *ngIf="activeTab === 'reportes'" id="reportes" class="reportes-tab">
   <div class="reportes-container">
     <div class="reportes-header">
@@ -656,5 +552,97 @@
         <p>Seleccione los filtros y haga clic en "Generar Reporte" para ver los datos</p>
       </div>
     </div>
+  </div>
+</div>
+
+  </main>
+</div>
+
+<!-- 📝 MODAL USUARIO -->
+<div *ngIf="showUsuarioModal" class="modal-overlay" (click)="closeUsuarioModal()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>{{ editingUsuario ? 'Editar Usuario' : 'Nuevo Usuario' }}</h3>
+      <button (click)="closeUsuarioModal()" class="close-btn">✕</button>
+    </div>
+
+    <form [formGroup]="usuarioForm" (ngSubmit)="saveUsuario()">
+      <div class="form-group">
+        <label>Nombre completo</label>
+        <input type="text" formControlName="nombre" placeholder="Juan Pérez">
+      </div>
+
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" formControlName="email" placeholder="usuario@email.com">
+      </div>
+
+      <div class="form-group">
+        <label>{{ editingUsuario ? 'Nueva contraseña (opcional)' : 'Contraseña' }}</label>
+        <input type="password" formControlName="password" placeholder="••••••">
+      </div>
+
+      <div class="form-group">
+        <label>Teléfono</label>
+        <input type="tel" formControlName="telefono" placeholder="+1234567890">
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" (click)="closeUsuarioModal()" class="secondary-btn">Cancelar</button>
+        <button type="submit" [disabled]="usuarioForm.invalid || loading" class="primary-btn">
+          {{ loading ? 'Guardando...' : 'Guardar' }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- 📝 MODAL MASCOTA -->
+<div *ngIf="showMascotaModal" class="modal-overlay" (click)="closeMascotaModal()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>{{ editingMascota ? 'Editar Mascota' : 'Nueva Mascota' }}</h3>
+      <button (click)="closeMascotaModal()" class="close-btn">✕</button>
+    </div>
+
+    <form [formGroup]="mascotaForm" (ngSubmit)="saveMascota()">
+      <div class="form-group">
+        <label>Nombre de la mascota</label>
+        <input type="text" formControlName="nombre" placeholder="Firulais">
+      </div>
+
+      <div class="form-group">
+        <label>Especie</label>
+        <select formControlName="especie">
+          <option value="">Seleccionar especie</option>
+          <option value="Perro">Perro</option>
+          <option value="Gato">Gato</option>
+          <option value="Ave">Ave</option>
+          <option value="Otro">Otro</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Raza</label>
+        <input type="text" formControlName="raza" placeholder="Labrador">
+      </div>
+
+      <div class="form-group">
+        <label>Edad (años)</label>
+        <input type="number" formControlName="edad" min="0" max="30">
+      </div>
+
+      <div class="form-group">
+        <label>Propietario (ID)</label>
+        <input type="text" formControlName="propietario" placeholder="ID del usuario">
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" (click)="closeMascotaModal()" class="secondary-btn">Cancelar</button>
+        <button type="submit" [disabled]="mascotaForm.invalid || loading" class="primary-btn">
+          {{ loading ? 'Guardando...' : 'Guardar' }}
+        </button>
+      </div>
+    </form>
   </div>
 </div>

@@ -370,6 +370,13 @@ export class Admin implements OnInit, AfterViewInit {
 
       // Forzar detección de cambios después de cargar todo
       this.cdr.detectChanges();
+
+      // Inicializar los gráficos después de que se hayan cargado los datos
+      setTimeout(() => {
+        console.log('📈 Inicializando gráficos del dashboard...');
+        this.initializeCharts();
+      }, 300);
+
     } catch (error) {
       console.error('❌ Error loading dashboard data:', error);
     } finally {
@@ -399,21 +406,62 @@ export class Admin implements OnInit, AfterViewInit {
       // Usar directamente los datos del backend SIN MAPEO
       this._stats = data;
 
-      // Actualizar chartData para los gráficos usando los datos del backend
+      // Actualizar chartData para los gráficos usando los datos del backend con estructura correcta
       this.chartData = {
-        perros: data.graficos?.mascotas_por_especie?.find((m: any) => m._id === 'perro')?.total || 0,
-        gatos: data.graficos?.mascotas_por_especie?.find((m: any) => m._id === 'gato')?.total || 0,
-        otros: data.graficos?.mascotas_por_especie?.filter((m: any) => !['perro', 'gato'].includes(m._id))?.reduce((sum: number, m: any) => sum + (m.total || 0), 0) || 0,
-        actividadMensual: data.graficos?.actividad_mensual || [0, 0, 0, 0, 0, 0],
-        dispositivosActivos: data.graficos?.dispositivos_por_hora || [0, 0, 0, 0, 0, 0]
+        // Estructura para gráfico de pastel (mascotas por especie)
+        mascotas: {
+          perros: data.graficos?.mascotas_por_especie?.find((m: any) => m._id === 'Perro')?.count || 0,
+          gatos: data.graficos?.mascotas_por_especie?.find((m: any) => m._id === 'Gato')?.count || 0,
+          otros: data.graficos?.mascotas_por_especie?.filter((m: any) => !['Perro', 'Gato'].includes(m._id))?.reduce((sum: number, m: any) => sum + (m.count || 0), 0) || 0
+        },
+        // Estructura para gráfico de barras (usuarios activos por horario)
+        usuariosActivos: {
+          matutino: data.graficos?.actividad_por_periodo?.matutino || 0,
+          vespertino: data.graficos?.actividad_por_periodo?.vespertino || 0,
+          nocturno: data.graficos?.actividad_por_periodo?.nocturno || 0
+        },
+        // Estructura para gráfico de líneas (dispositivos activos por hora)
+        dispositivosHora: data.graficos?.dispositivos_por_hora || Array(24).fill(0)
       };
 
-      console.log('✅ Stats asignadas directamente del backend:', this._stats);
+      console.log('✅ Stats y chartData actualizados:', { stats: this._stats, chartData: this.chartData });
       this.cdr.detectChanges();
 
     } catch (error) {
       console.error('❌ Error loading dashboard metrics:', error);
-      this._stats = null;
+
+      // Valores por defecto si falla la carga
+      this._stats = {
+        resumen: {
+          operaciones_24h: 0,
+          usuarios_activos_24h: 0,
+          tasa_exito: '100',
+          ubicaciones_gps_24h: 0,
+          total_usuarios: 0,
+          usuarios_nuevos_30d: 0,
+          total_mascotas: 0,
+          mascotas_nuevas_30d: 0,
+          dispositivos_conectados: 0,
+          usuarios_activos: 0
+        },
+        graficos: {
+          actividad_por_hora: [],
+          top_entidades: [],
+          estados_sistema: [],
+          mascotas_por_especie: [],
+          actividad_por_periodo: { matutino: 0, vespertino: 0, nocturno: 0 },
+          dispositivos_por_hora: Array(24).fill(0)
+        },
+        timestamp: new Date().toISOString(),
+        processingTime: 0
+      };
+
+      this.chartData = {
+        mascotas: { perros: 0, gatos: 0, otros: 0 },
+        usuariosActivos: { matutino: 0, vespertino: 0, nocturno: 0 },
+        dispositivosHora: Array(24).fill(0)
+      };
+
       this.cdr.detectChanges();
     }
   }
@@ -844,19 +892,24 @@ export class Admin implements OnInit, AfterViewInit {
 
     this.dashboardCharts.pieChart?.destroy();
 
+    // Usar la nueva estructura de datos para mascotas
+    const mascotas = this.chartData.mascotas || { perros: 0, gatos: 0, otros: 0 };
+    const total = mascotas.perros + mascotas.gatos + mascotas.otros;
+
     const data = {
       labels: ['Perros', 'Gatos', 'Otros'],
       datasets: [{
-        data: [
-          this.chartData.perros || 0,
-          this.chartData.gatos || 0,
-          this.chartData.otros || 0
-        ],
-        backgroundColor: ['#3b82f6', '#ef4444', '#10b981'],
+        data: total > 0 ? [mascotas.perros, mascotas.gatos, mascotas.otros] : [1],
+        backgroundColor: total > 0 ? ['#3b82f6', '#ef4444', '#10b981'] : ['#9ca3af'],
         borderWidth: 2,
         borderColor: '#ffffff'
       }]
     };
+
+    // Si no hay datos, mostrar etiqueta "Sin datos"
+    if (total === 0) {
+      data.labels = ['Sin datos'];
+    }
 
     this.dashboardCharts.pieChart = new Chart(ctx, {
       type: 'doughnut',
@@ -864,10 +917,52 @@ export class Admin implements OnInit, AfterViewInit {
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        layout: {
+          padding: {
+            bottom: 40
+          }
+        },
         plugins: {
           legend: {
+            display: true,
             position: 'bottom',
-            labels: { padding: 20, font: { size: 12 } }
+            align: 'center',
+            labels: {
+              padding: 15,
+              boxWidth: 12,
+              boxHeight: 12,
+              font: {
+                size: 11,
+                family: "'Inter', sans-serif"
+              },
+              color: '#334155',
+              usePointStyle: true,
+              generateLabels: (chart: any) => {
+                if (total === 0) {
+                  return [{
+                    text: 'Sin datos disponibles',
+                    fillStyle: '#9ca3af',
+                    strokeStyle: '#ffffff',
+                    lineWidth: 2,
+                    hidden: false,
+                    index: 0,
+                    pointStyle: 'circle'
+                  }];
+                }
+                return Chart.defaults.plugins.legend.labels.generateLabels(chart);
+              }
+            }
+          },
+          tooltip: {
+            callbacks: {
+              label: (context: any) => {
+                if (total === 0) return 'Sin datos disponibles';
+                const label = context.label || '';
+                const value = context.parsed || 0;
+                const percentage = ((value / total) * 100).toFixed(1);
+                return `${label}: ${value} (${percentage}%)`;
+              }
+            }
           }
         }
       }
@@ -882,13 +977,24 @@ export class Admin implements OnInit, AfterViewInit {
 
     this.dashboardCharts.barChart?.destroy();
 
+    // Usar los datos de usuarios activos por períodos (mañana, tarde, noche)
+    const usuariosData = this.chartData.usuariosActivos || { matutino: 0, vespertino: 0, nocturno: 0 };
+
     const data = {
-      labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun'],
+      labels: ['Matutino (6-12h)', 'Vespertino (12-20h)', 'Nocturno (20-6h)'],
       datasets: [{
-        label: 'Actividad de Dispositivos',
-        data: this.chartData.actividadMensual || [0, 0, 0, 0, 0, 0],
-        backgroundColor: 'rgba(59, 130, 246, 0.8)',
-        borderColor: 'rgba(59, 130, 246, 1)',
+        label: 'Usuarios Activos por Período',
+        data: [usuariosData.matutino, usuariosData.vespertino, usuariosData.nocturno],
+        backgroundColor: [
+          'rgba(255, 206, 86, 0.8)',
+          'rgba(75, 192, 192, 0.8)',
+          'rgba(153, 102, 255, 0.8)'
+        ],
+        borderColor: [
+          'rgba(255, 206, 86, 1)',
+          'rgba(75, 192, 192, 1)',
+          'rgba(153, 102, 255, 1)'
+        ],
         borderWidth: 1,
         borderRadius: 4
       }]
@@ -903,14 +1009,31 @@ export class Admin implements OnInit, AfterViewInit {
         scales: {
           y: {
             beginAtZero: true,
-            title: { display: true, text: 'Número de Registros' }
+            title: { display: true, text: 'Número de Usuarios' },
+            ticks: {
+              stepSize: 1
+            }
           },
           x: {
-            title: { display: true, text: 'Meses' }
+            title: { display: true, text: 'Período del Día' },
+            grid: {
+              display: false
+            }
           }
         },
         plugins: {
-          legend: { display: false }
+          legend: {
+            display: false
+          },
+          tooltip: {
+            callbacks: {
+              label: (context: any) => {
+                const periodo = context.label;
+                const usuarios = context.parsed.y;
+                return `${periodo}: ${usuarios} usuarios activos`;
+              }
+            }
+          }
         }
       }
     });
@@ -924,20 +1047,29 @@ export class Admin implements OnInit, AfterViewInit {
 
     this.dashboardCharts.lineChart?.destroy();
 
+    // Generar etiquetas para las 24 horas del día
+    const horasLabels = Array.from({ length: 24 }, (_, i) => {
+      const hora = i.toString().padStart(2, '0');
+      return `${hora}:00`;
+    });
+
+    // Usar los datos de actividad por dispositivos (24 valores)
+    const actividadData = this.chartData.dispositivosHora || this.chartData.actividadDispositivos || new Array(24).fill(0);
+
     const data = {
-      labels: ['0-4h', '4-8h', '8-12h', '12-16h', '16-20h', '20-24h'],
+      labels: horasLabels,
       datasets: [{
-        label: 'Dispositivos Activos',
-        data: this.chartData.dispositivosActivos || [0, 0, 0, 0, 0, 0],
-        borderColor: 'rgba(16, 185, 129, 1)',
-        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+        label: 'Actividad de Dispositivos por Hora',
+        data: actividadData,
+        borderColor: 'rgba(59, 130, 246, 1)',
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
         borderWidth: 3,
         fill: true,
         tension: 0.4,
-        pointBackgroundColor: 'rgba(16, 185, 129, 1)',
+        pointBackgroundColor: 'rgba(59, 130, 246, 1)',
         pointBorderColor: '#ffffff',
         pointBorderWidth: 2,
-        pointRadius: 6
+        pointRadius: 4
       }]
     };
 
@@ -950,14 +1082,29 @@ export class Admin implements OnInit, AfterViewInit {
         scales: {
           y: {
             beginAtZero: true,
-            title: { display: true, text: 'Dispositivos Activos' }
+            title: { display: true, text: 'Número de Actividades' },
+            ticks: {
+              stepSize: 1
+            }
           },
           x: {
-            title: { display: true, text: 'Horarios del Día' }
+            title: { display: true, text: 'Hora del Día' }
           }
         },
         plugins: {
-          legend: { display: false }
+          legend: {
+            display: true,
+            position: 'top'
+          },
+          tooltip: {
+            callbacks: {
+              label: (context: any) => {
+                const hora = context.label;
+                const actividad = context.parsed.y;
+                return `${hora}: ${actividad} actividades`;
+              }
+            }
+          }
         }
       }
     });
@@ -966,33 +1113,75 @@ export class Admin implements OnInit, AfterViewInit {
   async loadDashboardCharts(): Promise<void> {
     this.loading = true;
     try {
-      // Usar el endpoint específico para datos de gráficos
-      const response = await fetch('http://localhost:3000/api/admin/reportes/chart-data', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.adminData?.token || ''}`
-        },
-        body: JSON.stringify({
-          tipoGrafico: 'dashboard',
-          metrica: 'general',
-          periodo: '30d'
+      console.log('📈 Cargando datos específicos para gráficos del dashboard...');
+
+      // Obtener datos específicos para los 3 gráficos desde el backend
+      const [mascotasResponse, actividadResponse, usuariosResponse] = await Promise.all([
+        // 1. Datos para gráfico de pastel: Distribución de mascotas por tipo
+        fetch('http://localhost:3000/api/admin/reportes/generate-report', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.adminData?.token || ''}`
+          },
+          body: JSON.stringify({
+            tipoReporte: 'mascotas'
+          })
+        }),
+
+        // 2. Datos para actividad de dispositivos por hora (últimas 24h)
+        fetch('http://localhost:3000/api/admin/reportes/dashboard-metrics', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.adminData?.token || ''}`
+          }
+        }),
+
+        // 3. Datos para usuarios activos por horario (últimos 7 días)
+        fetch('http://localhost:3000/api/admin/reportes/generate-report', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.adminData?.token || ''}`
+          },
+          body: JSON.stringify({
+            tipoReporte: 'actividad'
+          })
         })
+      ]);
+
+      const mascotasData = await mascotasResponse.json();
+      const actividadData = await actividadResponse.json();
+      const usuariosData = await usuariosResponse.json();
+
+      console.log('📊 Datos recibidos para gráficos:', {
+        mascotas: mascotasData.total || 0,
+        actividad: actividadData.graficos?.actividad_por_hora?.length || 0,
+        usuarios: usuariosData.total || 0
       });
 
-      if (!response.ok) {
-        throw new Error(`Error del servidor: ${response.status}`);
+      // Procesar datos para cada gráfico
+      this.processChartData(mascotasData, actividadData, usuariosData);
+
+      // Asegurar que Chart.js esté cargado
+      if (!(window as any).Chart) {
+        await this.loadChartJS();
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
 
-      const data = await response.json();
+      // Crear los gráficos después de procesar los datos
+      setTimeout(() => {
+        this.createCharts();
+      }, 200);
 
-      // Mapear los datos del backend al formato esperado
+    } catch (error: any) {
+      console.error('❌ Error cargando datos de gráficos:', error);
+      // Si hay error, crear gráficos con datos vacíos
       this.chartData = {
-        perros: data.data?.mascotas_especie?.perro || 0,
-        gatos: data.data?.mascotas_especie?.gato || 0,
-        otros: data.data?.mascotas_especie?.otros || 0,
-        actividadMensual: data.data?.actividad_mensual || [0, 0, 0, 0, 0, 0],
-        dispositivosActivos: data.data?.dispositivos_por_hora || [0, 0, 0, 0, 0, 0]
+        mascotas: { perros: 0, gatos: 0, otros: 0 },
+        actividadDispositivos: Array(24).fill(0),
+        usuariosActivos: { matutino: 0, vespertino: 0, nocturno: 0 }
       };
 
       if (!(window as any).Chart) {
@@ -1000,20 +1189,67 @@ export class Admin implements OnInit, AfterViewInit {
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
 
-      setTimeout(() => this.createCharts(), 200);
-    } catch (error) {
-      console.error('Error loading dashboard charts:', error);
-      // Inicializar con datos por defecto en caso de error
-      this.chartData = {
-        perros: 0,
-        gatos: 0,
-        otros: 0,
-        actividadMensual: [0, 0, 0, 0, 0, 0],
-        dispositivosActivos: [0, 0, 0, 0, 0, 0]
-      };
+      setTimeout(() => {
+        this.createCharts();
+      }, 200);
     } finally {
       this.loading = false;
     }
+  }
+
+  private processChartData(mascotasData: any, actividadData: any, usuariosData: any): void {
+    // 1. Procesar distribución de mascotas por tipo
+    const mascotasPorTipo = { perros: 0, gatos: 0, otros: 0 };
+    if (mascotasData?.mascotas?.length > 0) {
+      mascotasData.mascotas.forEach((mascota: any) => {
+        const especie = mascota.especie?.toLowerCase();
+        if (especie === 'perro') {
+          mascotasPorTipo.perros++;
+        } else if (especie === 'gato') {
+          mascotasPorTipo.gatos++;
+        } else {
+          mascotasPorTipo.otros++;
+        }
+      });
+    }
+
+    // 2. Procesar actividad de dispositivos por hora (últimas 24h)
+    const actividadPorHora = Array(24).fill(0);
+    if (actividadData?.graficos?.actividad_por_hora?.length > 0) {
+      actividadData.graficos.actividad_por_hora.forEach((item: any) => {
+        const hora = item._id || item.hora || 0;
+        const operaciones = item.operaciones || item.count || 0;
+        if (hora >= 0 && hora < 24) {
+          actividadPorHora[hora] = operaciones;
+        }
+      });
+    }
+
+    // 3. Procesar usuarios activos por horario (matutino: 6-12, vespertino: 12-20, nocturno: 20-6)
+    const usuariosPorHorario = { matutino: 0, vespertino: 0, nocturno: 0 };
+    if (usuariosData?.actividad?.length > 0) {
+      usuariosData.actividad.forEach((item: any) => {
+        const hora = item._id?.hora || 0;
+        const usuarios = item.usuarios_count || 0;
+
+        if (hora >= 6 && hora < 12) {
+          usuariosPorHorario.matutino += usuarios;
+        } else if (hora >= 12 && hora < 20) {
+          usuariosPorHorario.vespertino += usuarios;
+        } else {
+          usuariosPorHorario.nocturno += usuarios;
+        }
+      });
+    }
+
+    // Asignar datos procesados
+    this.chartData = {
+      mascotas: mascotasPorTipo,
+      actividadDispositivos: actividadPorHora,
+      usuariosActivos: usuariosPorHorario
+    };
+
+    console.log('📈 Datos procesados para gráficos:', this.chartData);
   }
 
   // ==== GESTIÓN DE REPORTES ====
@@ -1300,6 +1536,7 @@ export class Admin implements OnInit, AfterViewInit {
           // Inicializar gráficos después de cargar los datos
           setTimeout(() => {
             this.initializeCharts();
+            this.loadDashboardCharts(); // Cargar datos específicos para gráficos
           }, 500);
         });
         break;
@@ -1310,8 +1547,7 @@ export class Admin implements OnInit, AfterViewInit {
         this.loadPets();
         break;
       case 'reportes':
-        // Cargar datos específicos para reportes
-        this.loadDashboardCharts();
+        // Los reportes se generan bajo demanda, no necesitan carga inicial
         break;
       case 'alertas':
         this.loadAlerts();
@@ -1426,7 +1662,7 @@ export class Admin implements OnInit, AfterViewInit {
     try {
       console.log('📋 Cargando logs de auditoría...');
 
-      const response = await fetch(`http://localhost:3000/api/auditoria/logs`, {
+      const response = await fetch(`http://localhost:3000/api/admin/auditoria`, {
         headers: {
           'Authorization': `Bearer ${this.adminData?.token || ''}`
         }
@@ -1437,7 +1673,7 @@ export class Admin implements OnInit, AfterViewInit {
       }
 
       const data = await response.json();
-      this.auditLogs = data.logs || [];
+      this.auditLogs = data.registros || [];
 
       console.log(`✅ ${this.auditLogs.length} logs de auditoría cargados`);
       this.cdr.detectChanges();

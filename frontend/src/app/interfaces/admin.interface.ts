@@ -66,6 +66,12 @@ export interface DashboardMetrics {
     estados_sistema: Array<any>;
     // Propiedades adicionales para compatibilidad
     mascotas_por_especie?: Array<any>;
+    actividad_por_periodo?: {
+      matutino: number;
+      vespertino: number;
+      nocturno: number;
+    };
+    dispositivos_por_hora?: number[];
   };
   timestamp: string;
   processingTime: number;
@@ -87,8 +93,21 @@ export interface TipoReporte {
   description: string;
 }
 
-// Datos para gráficos
+// Datos para gráficos (actualizado para los 3 gráficos específicos)
 export interface ChartData {
+  mascotas?: {
+    perros: number;
+    gatos: number;
+    otros: number;
+  };
+  actividadDispositivos?: number[]; // Array de 24 elementos (por hora)
+  dispositivosHora?: number[]; // Array de 24 elementos (por hora)
+  usuariosActivos?: {
+    matutino: number;   // 6-12h
+    vespertino: number; // 12-20h
+    nocturno: number;   // 20-6h
+  };
+  // Propiedades legacy para compatibilidad
   perros?: number;
   gatos?: number;
   otros?: number;
