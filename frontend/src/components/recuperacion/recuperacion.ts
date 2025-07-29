@@ -67,7 +67,7 @@ export class Recuperacion {
     );
 
     // Primero probemos el endpoint simple
-    const fetchPromise = fetch('http://localhost:3000/api/test', {
+    const fetchPromise = fetch('https://www.onichip.xyz/api/test', {
       method: 'GET'
     });
 
@@ -107,7 +107,7 @@ export class Recuperacion {
       setTimeout(() => reject(new Error('Timeout en validación: La base de datos está lenta')), 15000)
     );
 
-    const fetchPromise = fetch('http://localhost:3000/api/validar-email', {
+    const fetchPromise = fetch('https://www.onichip.xyz/api/validar-email', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -169,7 +169,7 @@ export class Recuperacion {
     const nuevaContrasena = this.passwordForm.get('nuevaContrasena')?.value;
 
     try {
-      const response = await fetch('http://localhost:3000/api/actualizar-contrasena', {
+      const response = await fetch('https://www.onichip.xyz/api/actualizar-contrasena', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

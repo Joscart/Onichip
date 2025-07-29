@@ -49,7 +49,7 @@ export interface Geofence {
   providedIn: 'root'
 })
 export class GpsService {
-  private apiUrl = 'http://localhost:3000/api';
+  private apiUrl = 'https://www.onichip.xyz/api';
 
   // Estado reactivo de ubicaciones
   private currentLocationsSubject = new BehaviorSubject<LocationData[]>([]);

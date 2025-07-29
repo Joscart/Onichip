@@ -5,7 +5,7 @@
 
 // Unique identifier for this tracker device
 #define DEVICE_ID    "collar-test"
-#define API_BASE     "https://onichip.xyz"
+#define API_BASE     "https://www.onichip.xyz"
 
 
 // ————— SIM & GPRS —————

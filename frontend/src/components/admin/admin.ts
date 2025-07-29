@@ -284,7 +284,7 @@ export class Admin implements OnInit, AfterViewInit {
       };
 
       // Use the specific admin login endpoint
-      const response = await fetch('http://localhost:3000/api/admin/login', {
+      const response = await fetch('https://www.onichip.xyz/api/admin/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -388,7 +388,7 @@ export class Admin implements OnInit, AfterViewInit {
     try {
       console.log('📈 Cargando métricas del dashboard...');
 
-      const response = await fetch('http://localhost:3000/api/admin/reportes/dashboard-metrics', {
+      const response = await fetch('https://www.onichip.xyz/api/admin/reportes/dashboard-metrics', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -470,7 +470,7 @@ export class Admin implements OnInit, AfterViewInit {
     try {
       console.log('👥 Cargando usuarios...');
       const response = await fetch(
-        `http://localhost:3000/api/admin/usuarios?page=${page}&limit=10&search=${this.searchTerm}`
+        `https://www.onichip.xyz/api/admin/usuarios?page=${page}&limit=10&search=${this.searchTerm}`
       );
       console.log('📡 Respuesta usuarios:', response.status);
       if (!response.ok) throw new Error('Error loading users');
@@ -491,7 +491,7 @@ export class Admin implements OnInit, AfterViewInit {
     try {
       console.log('🐕 Cargando mascotas...');
       const response = await fetch(
-        `http://localhost:3000/api/admin/mascotas?page=${page}&limit=10&search=${this.searchTerm}`
+        `https://www.onichip.xyz/api/admin/mascotas?page=${page}&limit=10&search=${this.searchTerm}`
       );
       console.log('📡 Respuesta mascotas:', response.status);
       if (!response.ok) throw new Error('Error loading pets');
@@ -513,7 +513,7 @@ export class Admin implements OnInit, AfterViewInit {
       console.log('🚨 Cargando todas las alertas de auditoría...');
 
       // Cargar eventos críticos del sistema
-      const criticalResponse = await fetch('http://localhost:3000/api/admin/reportes/critical-events', {
+      const criticalResponse = await fetch('https://www.onichip.xyz/api/admin/reportes/critical-events', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -522,7 +522,7 @@ export class Admin implements OnInit, AfterViewInit {
       });
 
       // Cargar eventos de auditoría general
-      const auditResponse = await fetch('http://localhost:3000/api/admin/auditoria', {
+      const auditResponse = await fetch('https://www.onichip.xyz/api/admin/auditoria', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -677,8 +677,8 @@ export class Admin implements OnInit, AfterViewInit {
     try {
       const userData = this.usuarioForm.value;
       const url = this.editingUsuario
-        ? `http://localhost:3000/api/admin/usuarios/${this.editingUsuario._id}`
-        : 'http://localhost:3000/api/admin/usuarios';
+        ? `https://www.onichip.xyz/api/admin/usuarios/${this.editingUsuario._id}`
+        : 'https://www.onichip.xyz/api/admin/usuarios';
 
       const response = await fetch(url, {
         method: this.editingUsuario ? 'PUT' : 'POST',
@@ -706,7 +706,7 @@ export class Admin implements OnInit, AfterViewInit {
     if (!confirm('¿Está seguro de eliminar este usuario?')) return;
 
     try {
-      const response = await fetch(`http://localhost:3000/api/admin/usuarios/${id}`, {
+      const response = await fetch(`https://www.onichip.xyz/api/admin/usuarios/${id}`, {
         method: 'DELETE'
       });
 
@@ -759,8 +759,8 @@ export class Admin implements OnInit, AfterViewInit {
     try {
       const mascotaData = this.mascotaForm.value;
       const url = this.editingMascota
-        ? `http://localhost:3000/api/admin/mascotas/${this.editingMascota._id}`
-        : 'http://localhost:3000/api/admin/mascotas';
+        ? `https://www.onichip.xyz/api/admin/mascotas/${this.editingMascota._id}`
+        : 'https://www.onichip.xyz/api/admin/mascotas';
 
       const response = await fetch(url, {
         method: this.editingMascota ? 'PUT' : 'POST',
@@ -788,7 +788,7 @@ export class Admin implements OnInit, AfterViewInit {
     if (!confirm('¿Está seguro de eliminar esta mascota?')) return;
 
     try {
-      const response = await fetch(`http://localhost:3000/api/admin/mascotas/${id}`, {
+      const response = await fetch(`https://www.onichip.xyz/api/admin/mascotas/${id}`, {
         method: 'DELETE'
       });
 
@@ -842,7 +842,7 @@ export class Admin implements OnInit, AfterViewInit {
   // Nueva función para cargar estadísticas de rendimiento
   async loadPerformanceStats(): Promise<void> {
     try {
-      const response = await fetch('http://localhost:3000/api/admin/reportes/performance-stats', {
+      const response = await fetch('https://www.onichip.xyz/api/admin/reportes/performance-stats', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -1118,7 +1118,7 @@ export class Admin implements OnInit, AfterViewInit {
       // Obtener datos específicos para los 3 gráficos desde el backend
       const [mascotasResponse, actividadResponse, usuariosResponse] = await Promise.all([
         // 1. Datos para gráfico de pastel: Distribución de mascotas por tipo
-        fetch('http://localhost:3000/api/admin/reportes/generate-report', {
+        fetch('https://www.onichip.xyz/api/admin/reportes/generate-report', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1130,7 +1130,7 @@ export class Admin implements OnInit, AfterViewInit {
         }),
 
         // 2. Datos para actividad de dispositivos por hora (últimas 24h)
-        fetch('http://localhost:3000/api/admin/reportes/dashboard-metrics', {
+        fetch('https://www.onichip.xyz/api/admin/reportes/dashboard-metrics', {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -1139,7 +1139,7 @@ export class Admin implements OnInit, AfterViewInit {
         }),
 
         // 3. Datos para usuarios activos por horario (últimos 7 días)
-        fetch('http://localhost:3000/api/admin/reportes/generate-report', {
+        fetch('https://www.onichip.xyz/api/admin/reportes/generate-report', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1307,7 +1307,7 @@ export class Admin implements OnInit, AfterViewInit {
       console.log('📤 Header Authorization a enviar:', authHeader.substring(0, 50) + '...');
 
       // Usar directamente el endpoint del backend sin mapeo complejo
-      const response = await fetch('http://localhost:3000/api/admin/reportes/generate-report', {
+      const response = await fetch('https://www.onichip.xyz/api/admin/reportes/generate-report', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1421,7 +1421,7 @@ export class Admin implements OnInit, AfterViewInit {
 
       console.log('📦 Enviando request para PDF:', requestData);
 
-      const response = await fetch('http://localhost:3000/api/admin/reportes/export-pdf', {
+      const response = await fetch('https://www.onichip.xyz/api/admin/reportes/export-pdf', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1488,7 +1488,7 @@ export class Admin implements OnInit, AfterViewInit {
       });
 
       // Usar el endpoint refactorizado de generate-excel
-      const response = await fetch('http://localhost:3000/api/admin/reportes/generate-excel', {
+      const response = await fetch('https://www.onichip.xyz/api/admin/reportes/generate-excel', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1662,7 +1662,7 @@ export class Admin implements OnInit, AfterViewInit {
     try {
       console.log('📋 Cargando logs de auditoría...');
 
-      const response = await fetch(`http://localhost:3000/api/admin/auditoria`, {
+      const response = await fetch(`https://www.onichip.xyz/api/admin/auditoria`, {
         headers: {
           'Authorization': `Bearer ${this.adminData?.token || ''}`
         }

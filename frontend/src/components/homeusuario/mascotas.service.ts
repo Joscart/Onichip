@@ -5,7 +5,7 @@ import { catchError, retry, timeout } from 'rxjs/operators';
 
 @Injectable({ providedIn: 'root' })
 export class MascotasService {
-  private apiUrl = 'http://localhost:3000/api/device';
+  private apiUrl = 'https://www.onichip.xyz/api/device';
 
   constructor(private http: HttpClient) {}
 
