@@ -41,6 +41,11 @@ bool useWifiLocation = false;
 // Estados de conexión
 enum ConnStatus { CONN_OK = 0, NO_NETWORK, GPRS_FAIL };
 enum LocationMethod { GPS_ONLY, WIFI_FALLBACK, HYBRID_MODE };
+enum ConnType { CONN_NONE = 0, CONN_WIFI, CONN_2G };
+
+// Variables de estado de conexión
+ConnType currentConnection = CONN_NONE;
+bool isConnectedToInternet = false;
 
 // Constantes para geolocalización GSM
 #define MAX_WIFI_NETWORKS   15    // Máximo redes WiFi a incluir
@@ -77,7 +82,249 @@ struct GSMData {
 bool        setPowerBoostKeepOn(bool en);
 float       readBatteryLevel();
 bool        readChargingStatus();
-ConnStatus  checkConnection();
+
+// === NUEVOS MÉTODOS DE CONECTIVIDAD ===
+ConnType    connect();                    // Establecer conexión (WiFi → 2G)
+void        disconnect();                 // Desconectar todas las redes
+bool        checkConnection();            // Solo verificar conexión actual con backend
+ConnStatus  checkConnectionLegacy();     // Función legacy para compatibilidad
+bool        sendData(String json);       // Envío de datos con validación
+bool        sendLocationData(LocationData &location, float batV, bool charging); // Envío de ubicación
+// === FIN NUEVOS MÉTODOS ===
+
+// =================== IMPLEMENTACIÓN NUEVOS MÉTODOS ===================
+
+// — Establecer conexión con prioridad WiFi → 2G
+ConnType connect() {
+    Serial.println("🔗 Estableciendo conexión...");
+    
+    // MÉTODO 1: Intentar WiFi primero
+    #ifdef TEST_WIFI
+    Serial.println("🌐 Intentando conexión WiFi...");
+    
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(ssid, password);
+    
+    int attempts = 0;
+    while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+        delay(500);
+        Serial.print(".");
+        attempts++;
+    }
+    
+    if (WiFi.status() == WL_CONNECTED) {
+        Serial.println("\n✅ WiFi conectado: " + WiFi.localIP().toString());
+        currentConnection = CONN_WIFI;
+        isConnectedToInternet = true;
+        return CONN_WIFI;
+    } else {
+        Serial.println("\n⚠️ WiFi no disponible, intentando 2G...");
+        WiFi.disconnect(true);
+        WiFi.mode(WIFI_OFF);
+        delay(1000);
+    }
+    #else
+    Serial.println("⚠️ TEST_WIFI no definido, usando solo 2G");
+    #endif
+    
+    // MÉTODO 2: Usar datos móviles como fallback
+    Serial.println("📡 Conectando datos móviles 2G...");
+    
+    // Verificar conexión de red móvil
+    if (!modem.isNetworkConnected()) {
+        Serial.println("❌ Sin señal de red móvil");
+        currentConnection = CONN_NONE;
+        isConnectedToInternet = false;
+        return CONN_NONE;
+    }
+    
+    // Verificar/establecer conexión GPRS
+    if (!modem.isGprsConnected()) {
+        Serial.println("🔄 Conectando GPRS...");
+        if (!modem.gprsConnect(GPRS_APN, GPRS_USER, GPRS_PASS)) {
+            Serial.println("❌ Fallo GPRS");
+            currentConnection = CONN_NONE;
+            isConnectedToInternet = false;
+            return CONN_NONE;
+        }
+    }
+    
+    Serial.println("✅ Conectado vía datos móviles 2G");
+    currentConnection = CONN_2G;
+    isConnectedToInternet = true;
+    return CONN_2G;
+}
+
+// — Desconectar todas las redes (estado idle)
+void disconnect() {
+    Serial.println("🔌 Desconectando todas las redes...");
+    
+    // Desconectar WiFi si está activo
+    if (WiFi.getMode() != WIFI_OFF) {
+        WiFi.disconnect(true);
+        WiFi.mode(WIFI_OFF);
+        Serial.println("📴 WiFi desconectado");
+    }
+    
+    // Desconectar GPRS si está activo
+    if (modem.isGprsConnected()) {
+        modem.gprsDisconnect();
+        Serial.println("📴 GPRS desconectado");
+    }
+    
+    currentConnection = CONN_NONE;
+    isConnectedToInternet = false;
+    Serial.println("✅ Sistema en modo idle - Sin conexiones activas");
+}
+
+// — Verificar conexión actual con backend (sin debug molesto)
+bool checkConnection() {
+    if (!isConnectedToInternet) {
+        return false;
+    }
+    
+    // Test rápido de conectividad al backend
+    HTTPClient http;
+    String testUrl = apiBase + "/api/health";
+    
+    http.begin(testUrl);
+    http.setTimeout(5000); // Timeout corto para verificación
+    
+    int httpCode = http.GET();
+    http.end();
+    
+    bool connected = (httpCode == 200 || httpCode == 404); // 404 también indica conectividad
+    
+    if (!connected) {
+        isConnectedToInternet = false;
+        currentConnection = CONN_NONE;
+    }
+    
+    return connected;
+}
+
+// — Envío de datos genérico con validación
+bool sendData(String json) {
+    if (!isConnectedToInternet) {
+        Serial.println("❌ Sin conexión a internet");
+        return false;
+    }
+    
+    HTTPClient http;
+    String endpoint = apiBase + "/api/device/" + deviceId + "/location";
+    
+    http.begin(endpoint);
+    http.addHeader("Content-Type", "application/json");
+    
+    // Configurar según tipo de conexión
+    if (currentConnection == CONN_WIFI) {
+        http.addHeader("User-Agent", "OniChip-ESP32-WiFi/1.0");
+        http.setTimeout(10000); // 10s para WiFi
+        Serial.println("📶 Enviando vía WiFi...");
+    } else if (currentConnection == CONN_2G) {
+        http.addHeader("User-Agent", "OniChip-ESP32-2G/1.0");
+        http.setTimeout(20000); // 20s para 2G
+        Serial.println("📡 Enviando vía datos móviles 2G...");
+    }
+    
+    int httpCode = http.PUT(json);
+    String response = http.getString();
+    http.end();
+    
+    if (httpCode == 200) {
+        Serial.println("✅ Datos enviados correctamente");
+        return true;
+    } else {
+        Serial.printf("❌ Error envío HTTP %d\n", httpCode);
+        
+        // Manejar errores específicos
+        if (httpCode == -1) {
+            Serial.println("💡 Error de conexión TCP/DNS");
+        } else if (httpCode == -5) {
+            Serial.println("💡 Timeout de conexión");
+        }
+        
+        // Marcar como desconectado si hay errores graves
+        if (httpCode == -1 || httpCode == -5) {
+            isConnectedToInternet = false;
+        }
+        
+        return false;
+    }
+}
+
+// — Envío específico de datos de ubicación
+bool sendLocationData(LocationData &location, float batV, bool charging) {
+    String json = buildLocationJson(location, batV, charging);
+    return sendData(json);
+}
+
+// — Función checkConnection legacy para compatibilidad con funciones de diagnóstico
+ConnStatus checkConnectionLegacy() {
+    Serial.println("🔍 Verificando conectividad (WiFi → 2G) [Legacy]...");
+    
+    // MÉTODO 1: Intentar WiFi primero (si está configurado)
+    #ifdef TEST_WIFI
+    Serial.println("🌐 Método 1: Verificando WiFi...");
+    
+    if (WiFi.getMode() == WIFI_OFF) {
+        WiFi.mode(WIFI_STA);
+        WiFi.begin(ssid, password);
+        
+        int attempts = 0;
+        while (WiFi.status() != WL_CONNECTED && attempts < 10) {
+            delay(500);
+            Serial.print(".");
+            attempts++;
+        }
+        
+        if (WiFi.status() == WL_CONNECTED) {
+            Serial.println("\n✅ WiFi conectado: " + WiFi.localIP().toString());
+            return CONN_OK;
+        } else {
+            Serial.println("\n⚠️ WiFi no disponible, probando datos móviles...");
+            WiFi.disconnect(true);
+            WiFi.mode(WIFI_OFF);
+            delay(1000);
+        }
+    } else if (WiFi.status() == WL_CONNECTED) {
+        Serial.println("✅ WiFi ya conectado: " + WiFi.localIP().toString());
+        return CONN_OK;
+    }
+    #else
+    Serial.println("⚠️ TEST_WIFI no definido, usando solo datos móviles");
+    #endif
+    
+    // MÉTODO 2: Usar datos móviles como fallback
+    Serial.println("📡 Método 2: Verificando datos móviles...");
+    
+    // Asegurar que WiFi esté deshabilitado para datos móviles
+    if (WiFi.getMode() != WIFI_OFF) {
+        WiFi.disconnect(true);
+        WiFi.mode(WIFI_OFF);
+        delay(1000);
+    }
+
+    // Verificar conexión de red móvil
+    if (!modem.isNetworkConnected()) {
+        Serial.println("❌ Sin señal de red móvil");
+        return NO_NETWORK;
+    }
+    
+    // Verificar conexión GPRS
+    if (!modem.isGprsConnected()) {
+        Serial.println("🔄 Conectando GPRS...");
+        if (!modem.gprsConnect(GPRS_APN, GPRS_USER, GPRS_PASS)) {
+            Serial.println("❌ Fallo GPRS - Verificar APN y crédito");
+            return GPRS_FAIL;
+        }
+        Serial.println("✅ GPRS conectado");
+    }
+    
+    Serial.println("✅ Conectado vía datos móviles 2G");
+    return CONN_OK;
+}
+
 void        reconnect();
 void        blinkError(int code);
 void        blinkConnected();
@@ -249,93 +496,79 @@ void setup() {
 }
 
 void loop() {
-  // ✨ NUEVO: Procesar comandos de diagnóstico desde Serial Monitor
+  // ✨ MANTENER: Procesar comandos de diagnóstico desde Serial Monitor
   procesarComandosDiagnostico();
   
-  LocationData location;
-  float batV;
-  bool charging;
+  // ======= NUEVA LÓGICA: CONEXIÓN → ENVÍO → DESCONEXIÓN =======
   
-  // Leer todos los datos (ubicación + batería)
-  readAllData(location, batV, charging);
-
-  ConnStatus st = checkConnection();
-  if (st == CONN_OK) {
-    unsigned long lastSend = millis();
-    unsigned long sendInterval = 30000; // 30 segundos
-    
-    while (checkConnection() == CONN_OK) {
-      // ✨ Procesar comandos durante el funcionamiento normal
-      procesarComandosDiagnostico();
-      
-      LocationData newLocation;
-      float newBatV;
-      bool newCharging;
-      
-      // Leer datos actualizados
-      readAllData(newLocation, newBatV, newCharging);
-      
-      // Construir JSON con los nuevos datos de ubicación
-      String json = buildLocationJson(newLocation, newBatV, newCharging);
-      
-      // Enviar al servidor usando la conexión disponible
-      HTTPClient http;
-      String endpoint = apiBase + "/api/device/" + deviceId + "/location";
-      
-      // Determinar qué conexión usar según el estado actual
-      String connectionType = "Unknown";
-      if (WiFi.status() == WL_CONNECTED) {
-        connectionType = "WiFi";
-        Serial.println("📶 Enviando vía WiFi: " + WiFi.localIP().toString());
-      } else if (modem.isGprsConnected()) {
-        connectionType = "2G";
-        Serial.println("📡 Enviando vía datos móviles 2G");
-      } else {
-        Serial.println("❌ Sin conexión disponible para envío");
-        blinkError(2);
-        continue; // Saltar este ciclo
-      }
-      
-      http.begin(endpoint);
-      http.addHeader("Content-Type", "application/json");
-      http.addHeader("User-Agent", "OniChip-ESP32-" + connectionType + "/1.0");
-      http.setTimeout(connectionType == "WiFi" ? 10000 : 20000); // WiFi más rápido
-      
-      int httpCode = http.PUT(json);
-      
-      if (httpCode == 200) {
-        Serial.printf("✅ Ubicación enviada correctamente vía %s\n", connectionType.c_str());
-        blinkConnected();
-      } else if (httpCode < 0) {
-        Serial.printf("❌ Error de conectividad %s (código %d)\n", connectionType.c_str(), httpCode);
-        if (httpCode == -1) {
-          Serial.println("💡 Error -1: Fallo total de conexión TCP/DNS");
-        } else if (httpCode == -5) {
-          Serial.println("💡 Error -5: Timeout de conexión");
-        }
-        blinkError(1);
-      } else {
-        Serial.printf("❌ Error HTTP %d enviando vía %s\n", httpCode, connectionType.c_str());
-        blinkError(1);
-      }
-      
-      http.end();
-      
-      // Esperar intervalo antes del siguiente envío
-      unsigned long now = millis();
-      while (millis() - now < sendInterval) {
-        // ✨ Procesar comandos durante la espera
-        procesarComandosDiagnostico();
-        delay(100);
-        if (checkConnection() != CONN_OK) break;
-      }
-    }
-    Serial.println("Conexión perdida con el servidor, intentando reconectar...");
-  } else {
-    reconnect();
-    blinkError(st);
+  // PASO 1: Establecer conexión
+  Serial.println("\n🔗 === INICIANDO CICLO DE TRANSMISIÓN ===");
+  ConnType connectionType = connect();
+  
+  if (connectionType == CONN_NONE) {
+    Serial.println("❌ Sin conectividad disponible - Esperando 30s...");
+    blinkError(2); // Parpadeo de error
     delay(30000);
+    return;
   }
+  
+  // PASO 2: Leer y enviar datos mientras hay conexión
+  unsigned long cycleStart = millis();
+  unsigned long sendInterval = 30000; // 30 segundos entre envíos
+  unsigned long lastSend = 0;
+  bool transmissionActive = true;
+  
+  Serial.printf("✅ Conexión establecida vía %s - Iniciando transmisiones\n", 
+                connectionType == CONN_WIFI ? "WiFi" : "2G");
+  
+  while (transmissionActive && (millis() - cycleStart < 300000)) { // Max 5 minutos por ciclo
+    // ✨ MANTENER: Procesar comandos durante transmisión
+    procesarComandosDiagnostico();
+    
+    // Verificar si es tiempo de enviar
+    if (millis() - lastSend >= sendInterval) {
+      // Verificar conexión antes de enviar
+      if (!checkConnection()) {
+        Serial.println("❌ Conexión perdida durante transmisión");
+        transmissionActive = false;
+        break;
+      }
+      
+      // Leer datos actuales
+      LocationData location;
+      float batV;
+      bool charging;
+      readAllData(location, batV, charging);
+      
+      // Enviar datos de ubicación
+      bool sendSuccess = sendLocationData(location, batV, charging);
+      
+      if (sendSuccess) {
+        blinkConnected(); // Parpadeo de éxito
+        Serial.printf("� Transmisión exitosa - Próximo envío en %ds\n", sendInterval/1000);
+      } else {
+        Serial.println("⚠️ Fallo en transmisión - Continuando...");
+        blinkError(1);
+      }
+      
+      lastSend = millis();
+    }
+    
+    // Pausa pequeña para no saturar CPU
+    delay(100);
+  }
+  
+  // PASO 3: Desconectar y entrar en modo idle
+  Serial.println("🔌 Finalizando ciclo de transmisión");
+  disconnect();
+  
+  // MANTENER: Debug de estado final
+  Serial.printf("💤 Entrando en modo idle por 30s (Ciclo duró %lus)\n", 
+                (millis() - cycleStart) / 1000);
+  
+  delay(30000); // Pausa antes del siguiente ciclo
+  
+  Serial.println("🔄 === FIN CICLO - REINICIANDO ===\n");
 }
 
 String buildJson(float lat, float lon, float speedKmh, int vitals, float batV, bool charging) {
@@ -375,76 +608,11 @@ bool readChargingStatus() {
 }
 
 // — Chequea conexión con fallback WiFi → Datos Móviles
-ConnStatus checkConnection() {
-  Serial.println("🔍 Verificando conectividad (WiFi → 2G)...");
-  
-  // MÉTODO 1: Intentar WiFi primero (si está configurado)
-  #ifdef TEST_WIFI
-  Serial.println("🌐 Método 1: Verificando WiFi...");
-  
-  if (WiFi.getMode() == WIFI_OFF) {
-    WiFi.mode(WIFI_STA);
-    WiFi.begin(ssid, password);
-    
-    int attempts = 0;
-    while (WiFi.status() != WL_CONNECTED && attempts < 10) {
-      delay(500);
-      Serial.print(".");
-      attempts++;
-    }
-    
-    if (WiFi.status() == WL_CONNECTED) {
-      Serial.println("\n✅ WiFi conectado: " + WiFi.localIP().toString());
-      return CONN_OK;
-    } else {
-      Serial.println("\n⚠️ WiFi no disponible, probando datos móviles...");
-      WiFi.disconnect(true);
-      WiFi.mode(WIFI_OFF);
-      delay(1000);
-    }
-  } else if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("✅ WiFi ya conectado: " + WiFi.localIP().toString());
-    return CONN_OK;
-  }
-  #else
-  Serial.println("⚠️ TEST_WIFI no definido, usando solo datos móviles");
-  #endif
-  
-  // MÉTODO 2: Usar datos móviles como fallback
-  Serial.println("📡 Método 2: Verificando datos móviles...");
-  
-  // Asegurar que WiFi esté deshabilitado para datos móviles
-  if (WiFi.getMode() != WIFI_OFF) {
-    WiFi.disconnect(true);
-    WiFi.mode(WIFI_OFF);
-    delay(1000);
-  }
-
-  // Verificar conexión de red móvil
-  if (!modem.isNetworkConnected()) {
-    Serial.println("❌ Sin señal de red móvil");
-    return NO_NETWORK;
-  }
-  
-  // Verificar conexión GPRS
-  if (!modem.isGprsConnected()) {
-    Serial.println("🔄 Conectando GPRS...");
-    if (!modem.gprsConnect(GPRS_APN, GPRS_USER, GPRS_PASS)) {
-      Serial.println("❌ Fallo GPRS - Verificar APN y crédito");
-      return GPRS_FAIL;
-    }
-    Serial.println("✅ GPRS conectado");
-  }
-  
-  Serial.println("✅ Conectado vía datos móviles 2G");
-  return CONN_OK;
-}
-
-// — Reconectar según fallo con fallback WiFi → 2G
+// — Reconectar según fallo con fallback WiFi → 2G (DEPRECATED - mantener para comandos de diagnóstico)
 void reconnect() {
   Serial.println("\n🔄 === PROCESO DE RECONEXIÓN ===");
   
-  ConnStatus st = checkConnection(); // Ahora usa el fallback WiFi → 2G
+  ConnStatus st = checkConnectionLegacy(); // Usar función legacy
   
   if (st == NO_NETWORK) {
     Serial.println("� Sin red móvil - Reiniciando módem completo...");
@@ -1298,6 +1466,9 @@ void procesarComandosDiagnostico() {
             Serial.println("\n📋 === COMANDOS DE DIAGNÓSTICO DISPONIBLES ===");
             Serial.println("help          - Mostrar esta ayuda");
             Serial.println("status        - Estado actual de conexiones");
+            Serial.println("connect       - Ejecutar proceso de conexión manual");
+            Serial.println("disconnect    - Desconectar todas las redes");
+            Serial.println("check         - Verificar conexión actual con backend");
             Serial.println("2g            - Diagnóstico completo 2G/móvil");
             Serial.println("datos         - Forzar uso SOLO datos móviles");
             Serial.println("backend       - Test conectividad backend");
@@ -1308,11 +1479,34 @@ void procesarComandosDiagnostico() {
             Serial.println("signal        - Calidad de señal móvil");
             Serial.println("reset         - Resetear módem SIM800");
             Serial.println("memoria       - Estado de memoria ESP32");
-            Serial.println("📱 COMANDO CLAVE: datos - Fuerza solo datos móviles");
+            Serial.println("📱 NUEVOS: connect, disconnect, check");
             Serial.println("📋 === FIN AYUDA ===\n");
             
         } else if (comando == "status" || comando == "estado") {
             mostrarEstadoConexion();
+            
+        } else if (comando == "connect" || comando == "conectar") {
+            Serial.println("\n🔗 === EJECUTANDO CONEXIÓN MANUAL ===");
+            disconnect(); // Primero desconectar todo
+            delay(1000);
+            ConnType result = connect();
+            if (result == CONN_NONE) {
+                Serial.println("❌ Conexión fallida");
+            } else {
+                Serial.printf("✅ Conectado vía %s\n", result == CONN_WIFI ? "WiFi" : "2G");
+            }
+            
+        } else if (comando == "disconnect" || comando == "desconectar") {
+            Serial.println("\n🔌 === DESCONECTANDO MANUALMENTE ===");
+            disconnect();
+            
+        } else if (comando == "check" || comando == "verificar") {
+            Serial.println("\n🔍 === VERIFICANDO CONEXIÓN BACKEND ===");
+            bool connected = checkConnection();
+            Serial.printf("Estado: %s\n", connected ? "✅ Conectado" : "❌ Desconectado");
+            Serial.printf("Conexión actual: %s\n", 
+                         currentConnection == CONN_WIFI ? "WiFi" : 
+                         currentConnection == CONN_2G ? "2G" : "Ninguna");
             
         } else if (comando == "2g" || comando == "movil") {
             diagnosticoConexion2G();
@@ -1343,6 +1537,33 @@ void procesarComandosDiagnostico() {
                 }
             }
             Serial.println("📶 === FIN ESTADO WIFI ===\n");
+            
+        } else if (comando == "datos" || comando == "2gonly") {
+            Serial.println("\n📡 === FORZANDO SOLO DATOS MÓVILES 2G ===");
+            
+            // Desconectar todo primero
+            disconnect();
+            delay(1000);
+            
+            // Forzar conexión solo 2G (sin intentar WiFi)
+            Serial.println("📡 Conectando directamente datos móviles 2G...");
+            
+            if (!modem.isNetworkConnected()) {
+                Serial.println("❌ Sin señal de red móvil");
+                return;
+            }
+            
+            if (!modem.isGprsConnected()) {
+                if (!modem.gprsConnect(GPRS_APN, GPRS_USER, GPRS_PASS)) {
+                    Serial.println("❌ Fallo GPRS");
+                    return;
+                }
+            }
+            
+            currentConnection = CONN_2G;
+            isConnectedToInternet = true;
+            Serial.println("✅ Conectado SOLO vía datos móviles 2G");
+            Serial.println("💡 WiFi deshabilitado, solo 2G activo");
             
         } else if (comando == "modem") {
             Serial.println("\n📱 === INFO DETALLADA MÓDEM ===");
@@ -1441,7 +1662,7 @@ void procesarComandosDiagnostico() {
             
             // Verificar y establecer conexión 2G
             Serial.println("📱 Verificando conexión datos móviles...");
-            ConnStatus status = checkConnection();
+            ConnStatus status = checkConnectionLegacy();
             
             switch (status) {
                 case CONN_OK: {
@@ -2135,7 +2356,7 @@ bool testConectividadBackend() {
     Serial.println("\n🌐 === TEST CONECTIVIDAD BACKEND ===");
     
     // Verificar conexión disponible
-    ConnStatus connectionStatus = checkConnection();
+    ConnStatus connectionStatus = checkConnectionLegacy();
     
     if (connectionStatus != CONN_OK) {
         Serial.println("❌ No hay conexión a internet disponible");
@@ -2463,7 +2684,7 @@ void diagnosticoReconexion() {
     // Paso 3: Test de conectividad a internet
     Serial.println("\n🌐 TEST CONECTIVIDAD INTERNET:");
     
-    ConnStatus finalStatus = checkConnection();
+    ConnStatus finalStatus = checkConnectionLegacy();
     
     switch (finalStatus) {
         case CONN_OK:
@@ -2594,7 +2815,18 @@ void mostrarEstadoConexion() {
     
     // Estado general de conectividad
     Serial.println("\n🌐 CONECTIVIDAD GENERAL:");
-    ConnStatus status = checkConnection();
+    Serial.printf("   📡 Estado actual: %s\n", 
+                 currentConnection == CONN_WIFI ? "WiFi" :
+                 currentConnection == CONN_2G ? "Datos Móviles 2G" : "Desconectado");
+    Serial.printf("   🌍 Internet: %s\n", isConnectedToInternet ? "✅ Disponible" : "❌ No disponible");
+    
+    // Test rápido de backend
+    if (isConnectedToInternet) {
+        Serial.print("   🔍 Test backend: ");
+        bool backendOK = checkConnection();
+        Serial.printf("%s\n", backendOK ? "✅ OK" : "❌ Fallo");
+    }
+    ConnStatus status = checkConnectionLegacy();
     switch (status) {
         case CONN_OK:
             Serial.println("   ✅ Conexión a internet disponible");
