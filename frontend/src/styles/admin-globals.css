@@ -1,0 +1,58 @@
+/* ESTILOS GLOBALES PARA ADMIN - EXTRAÍDOS DE admin.css */
+
+/* Reset y configuración base */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Estilos para emojis */
+.emoji {
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji", Arial, sans-serif !important;
+  font-variant-emoji: emoji !important;
+  text-rendering: auto !important;
+  -webkit-font-feature-settings: "liga" off, "kern" off !important;
+  font-feature-settings: "liga" off, "kern" off !important;
+}
+
+/* Animaciones comunes */
+@keyframes float {
+  0% { transform: translate(-50%, -50%) rotate(0deg); }
+  100% { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -468px 0; }
+  100% { background-position: 468px 0; }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* Utilidades globales */
+.loading {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.text-success { color: #10b981; }
+.text-error { color: #ef4444; }
+.text-warning { color: #f59e0b; }
+.text-info { color: #3b82f6; }
+
+/* Responsive helpers */
+@media (max-width: 768px) {
+  .hidden-mobile { display: none !important; }
+}
+
+@media (min-width: 769px) {
+  .hidden-desktop { display: none !important; }
+}
