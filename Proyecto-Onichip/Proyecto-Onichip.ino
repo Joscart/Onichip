@@ -278,17 +278,44 @@ void loop() {
       // Construir JSON con los nuevos datos de ubicación
       String json = buildLocationJson(newLocation, newBatV, newCharging);
       
-      // Enviar al servidor
+      // Enviar al servidor usando la conexión disponible
       HTTPClient http;
-      http.begin(apiBase + "/api/device/" + deviceId + "/location");
+      String endpoint = apiBase + "/api/device/" + deviceId + "/location";
+      
+      // Determinar qué conexión usar según el estado actual
+      String connectionType = "Unknown";
+      if (WiFi.status() == WL_CONNECTED) {
+        connectionType = "WiFi";
+        Serial.println("📶 Enviando vía WiFi: " + WiFi.localIP().toString());
+      } else if (modem.isGprsConnected()) {
+        connectionType = "2G";
+        Serial.println("📡 Enviando vía datos móviles 2G");
+      } else {
+        Serial.println("❌ Sin conexión disponible para envío");
+        blinkError(2);
+        continue; // Saltar este ciclo
+      }
+      
+      http.begin(endpoint);
       http.addHeader("Content-Type", "application/json");
+      http.addHeader("User-Agent", "OniChip-ESP32-" + connectionType + "/1.0");
+      http.setTimeout(connectionType == "WiFi" ? 10000 : 20000); // WiFi más rápido
+      
       int httpCode = http.PUT(json);
       
       if (httpCode == 200) {
-        Serial.println("✅ Ubicación enviada correctamente");
+        Serial.printf("✅ Ubicación enviada correctamente vía %s\n", connectionType.c_str());
         blinkConnected();
+      } else if (httpCode < 0) {
+        Serial.printf("❌ Error de conectividad %s (código %d)\n", connectionType.c_str(), httpCode);
+        if (httpCode == -1) {
+          Serial.println("💡 Error -1: Fallo total de conexión TCP/DNS");
+        } else if (httpCode == -5) {
+          Serial.println("💡 Error -5: Timeout de conexión");
+        }
+        blinkError(1);
       } else {
-        Serial.println("❌ Error enviando ubicación: " + String(httpCode));
+        Serial.printf("❌ Error HTTP %d enviando vía %s\n", httpCode, connectionType.c_str());
         blinkError(1);
       }
       
@@ -347,12 +374,47 @@ bool readChargingStatus() {
   return reg & (1 << 5);
 }
 
-// — Chequea red y GPRS - PRIORIZA DATOS MÓVILES
+// — Chequea conexión con fallback WiFi → Datos Móviles
 ConnStatus checkConnection() {
-  // NUEVO: Priorizar datos móviles sobre WiFi
-  // Verificar si WiFi está activo y deshabilitarlo para diagnóstico
+  Serial.println("🔍 Verificando conectividad (WiFi → 2G)...");
+  
+  // MÉTODO 1: Intentar WiFi primero (si está configurado)
+  #ifdef TEST_WIFI
+  Serial.println("🌐 Método 1: Verificando WiFi...");
+  
+  if (WiFi.getMode() == WIFI_OFF) {
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(ssid, password);
+    
+    int attempts = 0;
+    while (WiFi.status() != WL_CONNECTED && attempts < 10) {
+      delay(500);
+      Serial.print(".");
+      attempts++;
+    }
+    
+    if (WiFi.status() == WL_CONNECTED) {
+      Serial.println("\n✅ WiFi conectado: " + WiFi.localIP().toString());
+      return CONN_OK;
+    } else {
+      Serial.println("\n⚠️ WiFi no disponible, probando datos móviles...");
+      WiFi.disconnect(true);
+      WiFi.mode(WIFI_OFF);
+      delay(1000);
+    }
+  } else if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("✅ WiFi ya conectado: " + WiFi.localIP().toString());
+    return CONN_OK;
+  }
+  #else
+  Serial.println("⚠️ TEST_WIFI no definido, usando solo datos móviles");
+  #endif
+  
+  // MÉTODO 2: Usar datos móviles como fallback
+  Serial.println("📡 Método 2: Verificando datos móviles...");
+  
+  // Asegurar que WiFi esté deshabilitado para datos móviles
   if (WiFi.getMode() != WIFI_OFF) {
-    Serial.println("⚠️ WiFi detectado activo - Forzando uso de datos móviles");
     WiFi.disconnect(true);
     WiFi.mode(WIFI_OFF);
     delay(1000);
@@ -378,22 +440,19 @@ ConnStatus checkConnection() {
   return CONN_OK;
 }
 
-// — Reconectar según fallo - MEJORADO PARA DATOS MÓVILES
+// — Reconectar según fallo con fallback WiFi → 2G
 void reconnect() {
   Serial.println("\n🔄 === PROCESO DE RECONEXIÓN ===");
   
-  // Forzar desconexión WiFi para usar solo datos móviles
-  if (WiFi.getMode() != WIFI_OFF) {
-    Serial.println("📱 Deshabilitando WiFi para usar datos móviles");
+  ConnStatus st = checkConnection(); // Ahora usa el fallback WiFi → 2G
+  
+  if (st == NO_NETWORK) {
+    Serial.println("� Sin red móvil - Reiniciando módem completo...");
+    
+    // Asegurar que WiFi esté apagado antes del reset del módem
     WiFi.disconnect(true);
     WiFi.mode(WIFI_OFF);
     delay(1000);
-  }
-  
-  ConnStatus st = checkConnection();
-  
-  if (st == NO_NETWORK) {
-    Serial.println("🔧 Sin red móvil - Reiniciando módem completo...");
     
     // Reset completo del módem
     digitalWrite(MODEM_POWERON_PIN, LOW);

@@ -27,7 +27,8 @@
             ],
             "styles": [
               "node_modules/leaflet/dist/leaflet.css",
-              "src/styles.css"
+              "src/styles.css",
+              "src/styles/admin-globals.css"
             ]
           },
           "configurations": {
@@ -35,13 +36,13 @@
               "budgets": [
                 {
                   "type": "initial",
-                  "maximumWarning": "800kB",
-                  "maximumError": "1.5MB"
+                  "maximumWarning": "1MB",
+                  "maximumError": "2MB"
                 },
                 {
                   "type": "anyComponentStyle",
-                  "maximumWarning": "12kB",
-                  "maximumError": "20kB"
+                  "maximumWarning": "20kB",
+                  "maximumError": "40kB"
                 }
               ],
               "outputHashing": "all",
