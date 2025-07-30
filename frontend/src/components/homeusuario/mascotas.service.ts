@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Observable, throwError } from 'rxjs';
-import { catchError, retry, timeout } from 'rxjs/operators';
+import { catchError, retry, timeout, map } from 'rxjs/operators';
 
 @Injectable({ providedIn: 'root' })
 export class MascotasService {
@@ -18,6 +18,54 @@ export class MascotasService {
     }).pipe(
       timeout(8000), // Timeout de 8 segundos
       retry(1), // Reintentar 1 vez automáticamente
+      catchError(this.handleError)
+    );
+  }
+
+  getMascotaRealtime(deviceId: string): Observable<any> {
+    return this.http.get(`${this.apiUrl}/realtime/${deviceId}`, {
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Content-Type': 'application/json'
+      }
+    }).pipe(
+      timeout(5000),
+      retry(1),
+      map((response: any) => {
+        if (response && response.ubicacionActual) {
+          // Asegurarnos que los valores de latitud y longitud son números
+          response.ubicacionActual.latitude = Number(response.ubicacionActual.latitude);
+          response.ubicacionActual.longitude = Number(response.ubicacionActual.longitude);
+        }
+        return response;
+      }),
+      catchError(this.handleError)
+    );
+  }
+
+  getMascotasRealtimeBatch(deviceIds: string[]): Observable<any> {
+    return this.http.post(`${this.apiUrl}/realtime/batch`, { deviceIds }, {
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Content-Type': 'application/json'
+      }
+    }).pipe(
+      timeout(8000),
+      retry(1),
+      map((response: any) => {
+        if (Array.isArray(response)) {
+          // Procesar cada dispositivo en el batch
+          return response.map(device => {
+            if (device && device.ubicacionActual) {
+              // Asegurarnos que los valores de latitud y longitud son números
+              device.ubicacionActual.latitude = Number(device.ubicacionActual.latitude);
+              device.ubicacionActual.longitude = Number(device.ubicacionActual.longitude);
+            }
+            return device;
+          });
+        }
+        return response;
+      }),
       catchError(this.handleError)
     );
   }

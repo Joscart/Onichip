@@ -90,23 +90,40 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
     }, 30000); // 30 segundos
   }
 
-  // 🔄 ACTUALIZAR DATOS DE UBICACIÓN (simulado por ahora)
+  // 🔄 ACTUALIZAR DATOS DE UBICACIÓN EN TIEMPO REAL
   refreshLocationData() {
-    // Por ahora simular datos GPS hasta que el servicio esté funcionando
-    this.mascotas.forEach(mascota => {
-      if (mascota._id) {
-        // Guardar ubicación anterior para detectar cambios
-        const oldLocation = mascota.ubicacionActual ? { ...mascota.ubicacionActual } : null;
+    // Obtener solo las mascotas que tienen deviceId
+    const mascotasConDispositivo = this.mascotas.filter(
+      mascota => mascota.dispositivo?.id || mascota.deviceId
+    );
+    
+    if (mascotasConDispositivo.length === 0) {
+      console.log('ℹ️ No hay dispositivos para actualizar');
+      return;
+    }
 
-        // Simular datos GPS aleatorios para demo
-        mascota.ubicacionActual = {
-          latitude: 19.4326 + (Math.random() - 0.5) * 0.01,
-          longitude: -99.1332 + (Math.random() - 0.5) * 0.01,
-          accuracy: Math.floor(Math.random() * 10) + 5,
-          speed: Math.floor(Math.random() * 20),
-          method: Math.random() > 0.7 ? 'WiFi' : 'GPS',
-          timestamp: new Date().toISOString()
-        };
+    // Obtener los IDs de los dispositivos
+    const deviceIds = mascotasConDispositivo.map(
+      mascota => mascota.dispositivo?.id || mascota.deviceId
+    ).filter((id): id is string => id !== undefined);
+
+    // Obtener datos del backend
+    this.mascotasService.getMascotasRealtimeBatch(deviceIds).subscribe({
+      next: (response: any) => {
+        if (!response || !Array.isArray(response)) {
+          console.error('❌ Respuesta inválida del servidor:', response);
+          return;
+        }
+
+        // Actualizar cada mascota con sus datos en tiempo real
+        response.forEach(deviceData => {
+          const mascota = this.mascotas.find(m => 
+            (m.dispositivo?.id || m.deviceId) === deviceData.dispositivo?.id
+          );
+
+          if (mascota && deviceData.ubicacionActual) {
+            // Guardar ubicación anterior para detectar cambios
+            const oldLocation = mascota.ubicacionActual ? { ...mascota.ubicacionActual } : null;
 
         // Si el mapa está abierto y es la mascota seleccionada, actualizar el mapa
         if (this.showMapModal && this.selectedMascota &&
@@ -316,23 +333,18 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
 
   // 🔄 ACTUALIZAR UBICACIÓN DE UNA MASCOTA ESPECÍFICA
   refreshSingleMascotaLocation(mascota: any) {
-    if (!mascota) return;
+    if (!mascota?.dispositivo?.id) return;
 
-    // Guardar ubicación anterior
-    const oldLocation = mascota.ubicacionActual ? { ...mascota.ubicacionActual } : null;
+    // Obtener datos en tiempo real del backend
+    this.mascotasService.getMascotaRealtime(mascota.dispositivo.id).subscribe({
+      next: (deviceData: any) => {
+        if (deviceData?.ubicacionActual) {
+          // Guardar ubicación anterior
+          const oldLocation = mascota.ubicacionActual ? { ...mascota.ubicacionActual } : null;
 
-    // Simular nueva ubicación GPS (reemplazar con llamada real al API)
-    const newLocation = {
-      latitude: 19.4326 + (Math.random() - 0.5) * 0.01,
-      longitude: -99.1332 + (Math.random() - 0.5) * 0.01,
-      accuracy: Math.floor(Math.random() * 10) + 5,
-      speed: Math.floor(Math.random() * 20),
-      method: Math.random() > 0.7 ? 'WiFi' : 'GPS',
-      timestamp: new Date().toISOString()
-    };
-
-    // Actualizar la ubicación
-    mascota.ubicacionActual = newLocation;
+          // Actualizar con datos del backend
+          mascota.ubicacionActual = deviceData.ubicacionActual;
+          mascota.dispositivo = deviceData.dispositivo;
 
     // Si hay cambio significativo, actualizar el mapa
     if (oldLocation) {
@@ -576,20 +588,11 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
     `;
   }
 
-  // 🎲 SIMULAR ACTUALIZACIÓN DE UBICACIÓN (temporal)
-  simulateLocationUpdate() {
-    if (!this.selectedMascota?.ubicacionActual) return;
-
-    const location = this.selectedMascota.ubicacionActual;
-
-    // Pequeña variación en la ubicación para simular movimiento
-    location.latitude += (Math.random() - 0.5) * 0.0001;
-    location.longitude += (Math.random() - 0.5) * 0.0001;
-    location.accuracy = Math.floor(Math.random() * 15) + 5;
-    location.speed = Math.floor(Math.random() * 10);
-    location.timestamp = new Date().toISOString();
-
-    console.log('🔄 Ubicación actualizada:', location);
+  // 🔄 ACTUALIZAR UBICACIÓN
+  refreshLocation() {
+    if (!this.selectedMascota?.dispositivo?.id) return;
+    
+    this.refreshSingleLocation();
   }
 
   verHistorial(mascota: any) {
