@@ -8,51 +8,90 @@ import { Mascota } from '../../app/interfaces/mascota.interface';
 
 @Injectable({ providedIn: 'root' })
 export class MascotasService {
-  private apiUrl = 'http://localhost:3000/api/mascotas';
-  private wsUrl = 'ws://localhost:3000'; // Cambia a ws://localhost:3000 si es local
+  private apiUrl = 'https://www.onichip.xyz/api/mascotas';
+  private wsUrl = 'wss://www.onichip.xyz/api/mascotas'; // WebSocket a través de la ruta API
   private mascotasSubject = new BehaviorSubject<Mascota[]>([]);
   mascotas$ = this.mascotasSubject.asObservable();
   private ws: WebSocket | null = null;
+  private pollingInterval: any = null;
+  private currentOwnerId: string | null = null;
 
   constructor(private http: HttpClient, private ngZone: NgZone) {
-    this.connectWebSocket();
+    // Intentar WebSocket primero, pero no bloquear si falla
+    this.tryConnectWebSocket();
+  }
+
+  private tryConnectWebSocket() {
+    try {
+      this.connectWebSocket();
+    } catch (error) {
+      console.warn('⚠️ WebSocket no disponible, usando modo polling:', error);
+      // Fallback a polling si WebSocket falla
+    }
   }
 
   private connectWebSocket() {
+    console.log('🔌 Intentando conectar WebSocket a:', this.wsUrl);
     this.ws = new WebSocket(this.wsUrl);
+
     this.ws.onopen = () => {
-      console.log('🛰️ WebSocket mascotas conectado');
+      console.log('🛰️ WebSocket mascotas conectado exitosamente');
     };
+
     this.ws.onmessage = (event) => {
+      console.log('📩 Mensaje WebSocket recibido:', event.data);
       this.ngZone.run(() => {
         try {
           const msg = JSON.parse(event.data);
+          console.log('📝 Mensaje parseado:', msg);
           if (msg.type === 'mascota_update') {
+            console.log('🔄 Actualizando mascota via WebSocket:', msg.data);
             this.handleMascotaUpdate(msg.data);
           }
         } catch (e) {
-          console.error('Error parseando mensaje WS:', e);
+          console.error('❌ Error parseando mensaje WS:', e, 'Data:', event.data);
         }
       });
     };
-    this.ws.onclose = () => {
-      console.warn('WebSocket mascotas desconectado, reintentando en 3s...');
+
+    this.ws.onerror = (error) => {
+      console.error('❌ Error WebSocket:', error);
+    };
+
+    this.ws.onclose = (event) => {
+      console.warn('❌ WebSocket desconectado. Code:', event.code, 'Reason:', event.reason);
+      console.log('🔄 Reintentando conexión en 3 segundos...');
       setTimeout(() => this.connectWebSocket(), 3000);
     };
   }
 
   private handleMascotaUpdate(update: { action: string, mascota: Mascota }) {
+    console.log('🔄 Procesando actualización:', update.action, 'para mascota:', update.mascota?.nombre);
     const mascotas = [...this.mascotasSubject.value];
+    console.log('📊 Lista actual tiene', mascotas.length, 'mascotas');
+
     if (update.action === 'create') {
       mascotas.push(update.mascota);
+      console.log('➕ Mascota agregada:', update.mascota.nombre);
     } else if (update.action === 'update') {
       const idx = mascotas.findIndex(m => m.deviceId === update.mascota.deviceId);
-      if (idx !== -1) mascotas[idx] = update.mascota;
+      if (idx !== -1) {
+        mascotas[idx] = update.mascota;
+        console.log('✏️ Mascota actualizada en índice', idx, ':', update.mascota.nombre);
+      } else {
+        console.warn('⚠️ No se encontró mascota con deviceId:', update.mascota.deviceId);
+      }
     } else if (update.action === 'delete') {
       const idx = mascotas.findIndex(m => m.deviceId === update.mascota.deviceId);
-      if (idx !== -1) mascotas.splice(idx, 1);
+      if (idx !== -1) {
+        mascotas.splice(idx, 1);
+        console.log('🗑️ Mascota eliminada del índice', idx);
+      }
     }
+
+    console.log('📊 Lista actualizada tiene', mascotas.length, 'mascotas');
     this.mascotasSubject.next(mascotas);
+    console.log('✅ Observable actualizado');
   }
   /**
    * Inicializa la lista de mascotas para el usuario (solo una vez al entrar)

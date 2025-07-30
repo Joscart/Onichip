@@ -59,15 +59,20 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
       this.mascotasService.mascotas$
         .pipe(takeUntil(this.destroy$))
         .subscribe(mascotas => {
+          console.log('🏠 HomeUsuario recibió actualización:', mascotas.length, 'mascotas');
           this.mascotas = mascotas;
           // Si hay una mascota seleccionada, actualizar la referencia a la versión más reciente
           if (this.selectedMascota) {
             const id = this.selectedMascota.deviceId || this.selectedMascota.dispositivo?.id || this.selectedMascota._id;
             const updated = mascotas.find(m => m.deviceId === id || m.dispositivo?.id === id || m._id === id);
-            if (updated) this.selectedMascota = updated;
+            if (updated) {
+              console.log('🔄 Actualizando selectedMascota:', updated.nombre);
+              this.selectedMascota = updated;
+            }
           }
           this.loading = false;
           this.cdr.detectChanges();
+          console.log('✅ Vista actualizada con', this.mascotas.length, 'mascotas');
         });
     }
   }
