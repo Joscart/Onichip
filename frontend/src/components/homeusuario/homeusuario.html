@@ -1,8 +1,8 @@
 
 <!-- Navbar Component -->
-<app-navbar 
+<app-navbar
   [userName]="user?.nombre || user?.name"
-  [title]="'🗺️ Onichip GPS'"
+  [title]="'Panel de Control'"
   [showUserActions]="true"
   (logout)="onLogout()"
   (navigateToRegister)="onNavigateToRegister()">
@@ -10,10 +10,10 @@
 
 <!-- Botón de actualización flotante -->
 <div class="floating-controls">
-  <button 
-    class="refresh-btn" 
-    (click)="refreshData()" 
-    [disabled]="loading" 
+  <button
+    class="refresh-btn"
+    (click)="refreshData()"
+    [disabled]="loading"
     title="Actualizar ubicaciones">
     🔄 {{ loading ? 'Cargando...' : 'Actualizar' }}
   </button>
@@ -64,63 +64,63 @@
       <div class="mascota-info">
         <div class="mascota-header">
           <h3>{{ mascota.nombre }}</h3>
-          <span class="pet-type">{{ getPetTypeIcon(mascota.tipo) }} {{ mascota.tipo }}</span>
+          <span class="pet-type">{{ getPetTypeIcon(mascota.especie) }} {{ mascota.especie }}</span>
         </div>
-        
+
         <div class="mascota-row">
-          <span class="emoji">🦴</span> 
+          <span class="emoji">🦴</span>
           <strong>Raza:</strong> {{ mascota.raza }}
         </div>
-        
+
         <div class="mascota-row">
-          <span class="emoji">🎂</span> 
+          <span class="emoji">🎂</span>
           <strong>Edad:</strong> {{ mascota.edad }} años
         </div>
-        
+
         <!-- Información GPS -->
         <div class="gps-section">
           <div class="section-header">
             <h4>📍 Ubicación GPS</h4>
             <span class="last-update">{{ getLastLocationUpdate(mascota) }}</span>
           </div>
-          
+
           <div class="location-info" *ngIf="mascota.ubicacionActual; else noLocation">
             <div class="location-row">
               <span class="emoji">�️</span>
-              <strong>Método:</strong> 
+              <strong>Método:</strong>
               <span class="method-badge" [class]="mascota.ubicacionActual.method?.toLowerCase()">
                 {{ mascota.ubicacionActual.method || 'GPS' }}
               </span>
             </div>
-            
+
             <div class="location-row">
               <span class="emoji">�</span>
               <strong>Precisión:</strong> {{ mascota.ubicacionActual.accuracy || 'N/A' }}m
             </div>
-            
+
             <div class="location-row">
               <span class="emoji">🏃</span>
               <strong>Velocidad:</strong> {{ mascota.ubicacionActual.speed || 0 }} km/h
             </div>
-            
-            <div class="location-row" *ngIf="mascota.dispositivo?.bateria">
+
+            <div class="location-row" *ngIf="mascota.dispositivo?.estadoBateria">
               <span class="emoji">🔋</span>
-              <strong>Batería:</strong> 
+              <strong>Batería:</strong>
               <div class="battery-bar">
-                <div class="battery-level" [style.width.%]="mascota.dispositivo.bateria.nivel">
-                  {{ mascota.dispositivo.bateria.nivel }}%
+                <div class="battery-level" [style.width.%]="mascota.dispositivo.estadoBateria.nivel">
+                  {{ mascota.dispositivo.estadoBateria.nivel }}%
                 </div>
               </div>
             </div>
-            
+
             <div class="coordinates">
               <small>
-                📍 {{ mascota.ubicacionActual.latitude?.toFixed(6) }}, 
-                {{ mascota.ubicacionActual.longitude?.toFixed(6) }}
+                📍 {{ mascota.ubicacionActual.latitud?.toFixed(6) }},
+                {{ mascota.ubicacionActual.longitud?.toFixed(6) }}
               </small>
             </div>
           </div>
-          
+
           <ng-template #noLocation>
             <div class="no-location">
               <span class="emoji">❌</span>
@@ -128,52 +128,52 @@
             </div>
           </ng-template>
         </div>
-        
+
         <!-- Información del dispositivo -->
         <div class="device-section">
           <div class="section-header">
             <h4>📱 Dispositivo</h4>
           </div>
-          
+
           <div class="device-row">
             <span class="emoji">🔗</span>
             <strong>ID:</strong> {{ mascota.dispositivo?.id || 'No asociado' }}
           </div>
-          
+
           <div class="device-row" *ngIf="mascota.dispositivo?.ultimaConexion">
             <span class="emoji">�</span>
             <strong>Última conexión:</strong> {{ mascota.dispositivo.ultimaConexion | date:'short' }}
           </div>
-          
+
           <button (click)="asociarDispositivo(mascota)" class="asociar-btn">
             {{ mascota.dispositivo?.id ? '✏️ Editar' : '🔗 Asociar' }} Dispositivo
           </button>
         </div>
-        
+
         <!-- Estadísticas de ubicación -->
         <div class="stats-section" *ngIf="mascota.estadisticas">
           <div class="section-header">
             <h4>📊 Estadísticas</h4>
           </div>
-          
+
           <div class="stats-grid">
             <div class="stat-item">
-              <span class="stat-value">{{ mascota.estadisticas.distanciaRecorrida || 0 }}</span>
+              <span class="stat-value">{{ mascota.estadisticas.totalDistancia || 0 }}</span>
               <span class="stat-label">km recorridos</span>
             </div>
-            
+
             <div class="stat-item">
-              <span class="stat-value">{{ mascota.estadisticas.tiempoActivo || 0 }}</span>
+              <span class="stat-value">{{ mascota.estadisticas.tiempoActividad || 0 }}</span>
               <span class="stat-label">horas activo</span>
             </div>
-            
+
             <div class="stat-item">
               <span class="stat-value">{{ mascota.estadisticas.zonasVisitadas || 0 }}</span>
               <span class="stat-label">zonas visitadas</span>
             </div>
           </div>
         </div>
-        
+
         <!-- Acciones -->
         <div class="action-buttons">
           <button (click)="verMapa(mascota)" class="action-btn primary">
@@ -202,7 +202,7 @@
           <button class="control-btn" (click)="refreshLocation()" title="Actualizar ubicación">
             🔄 Actualizar
           </button>
-          <button class="control-btn" [class.active]="mapUpdateInterval" 
+          <button class="control-btn" [class.active]="mapUpdateInterval"
                   (click)="toggleAutoUpdate()" title="Auto-actualización cada 10s">
             {{ mapUpdateInterval ? '⏸️ Pausar' : '▶️ Auto' }}
           </button>
@@ -213,7 +213,7 @@
         <div class="map-info" *ngIf="selectedMascota?.ubicacionActual">
           <div class="location-details">
             <span class="info-item">
-              📍 {{ selectedMascota.ubicacionActual.latitude?.toFixed(6) }}, 
+              📍 {{ selectedMascota.ubicacionActual.latitude?.toFixed(6) }},
               {{ selectedMascota.ubicacionActual.longitude?.toFixed(6) }}
             </span>
             <span class="info-item">
@@ -230,24 +230,24 @@
             </span>
           </div>
         </div>
-        
+
         <!-- Contenedor del mapa -->
         <div class="map-container">
           <div id="pet-map" class="leaflet-map" #mapContainer></div>
-          
+
           <!-- Overlay de carga del mapa -->
           <div class="map-loading" *ngIf="mapLoading">
             <div class="loading-spinner"></div>
             <p>Cargando mapa...</p>
           </div>
-          
+
           <!-- Mensaje de error del mapa -->
           <div class="map-error" *ngIf="mapError">
             <span class="emoji">❌</span>
             <p>Error al cargar el mapa</p>
             <button (click)="initializeMap()" class="retry-btn">🔄 Reintentar</button>
           </div>
-          
+
           <!-- Sin ubicación -->
           <div class="no-location-map" *ngIf="!selectedMascota?.ubicacionActual && !mapLoading">
             <span class="emoji">📍</span>

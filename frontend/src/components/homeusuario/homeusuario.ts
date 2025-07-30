@@ -124,8 +124,8 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
   }
 
   // Obtener icono según el tipo de mascota
-  getPetTypeIcon(tipo: string): string {
-    switch (tipo?.toLowerCase()) {
+  getPetTypeIcon(especie: string): string {
+    switch (especie?.toLowerCase()) {
       case 'perro': return '🐕';
       case 'gato': return '🐱';
       case 'conejo': return '🐰';
@@ -229,8 +229,8 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
           mascota.dispositivo = deviceData.dispositivo;
           // Si hay cambio significativo, actualizar el mapa
           if (oldLocation) {
-            const latDiff = Math.abs(deviceData.ubicacionActual.latitude - oldLocation.latitude);
-            const lngDiff = Math.abs(deviceData.ubicacionActual.longitude - oldLocation.longitude);
+            const latDiff = Math.abs(deviceData.ubicacionActual.latitud - oldLocation.latitud);
+            const lngDiff = Math.abs(deviceData.ubicacionActual.longitud - oldLocation.longitud);
             if (latDiff > 0.000001 || lngDiff > 0.000001) {
               console.log('📍 Ubicación actualizada:', deviceData.ubicacionActual);
               this.updateMapLocation();
@@ -263,9 +263,9 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
       }
 
       const location = this.selectedMascota.ubicacionActual;
-      const lat = location.latitude;
-      const lng = location.longitude;
-      const accuracy = location.accuracy || 10;
+      const lat = location.latitud;
+      const lng = location.longitud;
+      const accuracy = location.precision || 10;
 
       // Crear el mapa centrado en la ubicación de la mascota
       this.map = L.map('pet-map', {
@@ -325,7 +325,7 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
     if (!this.map || !this.selectedMascota?.ubicacionActual) return;
 
     const location = this.selectedMascota.ubicacionActual;
-    this.map.setView([location.latitude, location.longitude], 16);
+    this.map.setView([location.latitud, location.longitud], 16);
   }
 
   // 🔄 ACTUALIZAR UBICACIÓN EN EL MAPA
@@ -339,9 +339,9 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
     if (!this.map || !this.selectedMascota?.ubicacionActual) return;
 
     const location = this.selectedMascota.ubicacionActual;
-    const lat = location.latitude;
-    const lng = location.longitude;
-    const accuracy = location.accuracy || 10;
+    const lat = location.latitud;
+    const lng = location.longitud;
+    const accuracy = location.precision || 10;
 
     try {
       // Actualizar posición del marcador con animación suave
@@ -424,7 +424,7 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
 
   // 🏷️ CREAR ICONO DEL MAPA PARA LA MASCOTA
   getPetMapIcon(mascota: any): string {
-    const petEmoji = mascota.tipo === 'Perro' ? '🐕' : '🐱';
+    const petEmoji = mascota.especie === 'Perro' ? '🐕' : '🐱';
     const statusColor = this.getLocationStatusColor(mascota);
 
     return `
@@ -455,10 +455,10 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
         <h4>${mascota.nombre}</h4>
         <div class="popup-info">
           <p><strong>📍 Coordenadas:</strong><br>
-             ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}</p>
-          <p><strong>🎯 Precisión:</strong> ${location.accuracy}m</p>
+             ${location.latitud.toFixed(6)}, ${location.longitud.toFixed(6)}</p>
+          <p><strong>🎯 Precisión:</strong> ${location.precision}m</p>
           <p><strong>🏃 Velocidad:</strong> ${location.speed || 0} km/h</p>
-          <p><strong>📶 Método:</strong> ${location.method || 'GPS'}</p>
+          <p><strong>📶 Método:</strong> ${location.metodo || 'GPS'}</p>
           <p><strong>⏰ Actualizado:</strong> ${lastUpdate}</p>
         </div>
       </div>
@@ -480,9 +480,9 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
   }
 
   getPetImage(mascota: any): string {
-    if (mascota.especie === 'Perro' || mascota.tipo === 'Perro') {
+    if (mascota.especie === 'Perro') {
       return 'assets/avatar-perro.png';
-    } else if (mascota.especie === 'Gato' || mascota.tipo === 'Gato') {
+    } else if (mascota.especie === 'Gato') {
       return 'assets/avatar-gato.png';
     }
     return 'assets/toby.png';

@@ -97,8 +97,15 @@ export class MascotasService {
    * Inicializa la lista de mascotas para el usuario (solo una vez al entrar)
    */
   loadMascotasByOwner(ownerId: string) {
+    console.log('🔄 loadMascotasByOwner llamado con ownerId:', ownerId);
     this.getMascotasByOwner(ownerId).subscribe((mascotas: Mascota[]) => {
+      console.log('📦 Datos recibidos del API:', mascotas);
+      console.log('📊 Cantidad de mascotas recibidas:', mascotas.length);
+      if (mascotas.length > 0) {
+        console.log('🐾 Primera mascota:', mascotas[0]);
+      }
       this.mascotasSubject.next(mascotas);
+      console.log('✅ mascotasSubject actualizado con', mascotas.length, 'mascotas');
     });
   }
 

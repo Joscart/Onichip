@@ -4,24 +4,25 @@ export interface Mascota {
   nombre: string;
   propietario: any;
   ubicacionActual?: {
-    latitud: number;
-    longitud: number;
-    precision?: number;
+    latitud: number;      // Mantener latitud (como envía el backend)
+    longitud: number;     // Mantener longitud (como envía el backend)
+    precision?: number;   // Mantener precision (como envía el backend)
     timestamp?: string;
-    metodo?: string;
+    metodo?: string;      // Mantener metodo (como envía el backend)
+    speed?: number;
   };
   dispositivo?: {
     id: string;
     tipo?: string;
     version?: string;
     ultimaConexion?: string;
-    estadoBateria?: {
+    estadoBateria?: {     // Mantener estadoBateria (como envía el backend)
       nivel?: number;
       cargando?: boolean;
       ultimaActualizacion?: string;
     };
   };
-  especie: string;
+  especie: string;        // Mantener especie (como envía el backend)
   raza?: string;
   edad?: number;
   peso?: number;
@@ -37,8 +38,8 @@ export interface Mascota {
     compartirUbicacion?: boolean;
   };
   estadisticas?: {
-    totalDistancia?: number;
-    tiempoActividad?: number;
+    totalDistancia?: number;    // Mantener como envía el backend
+    tiempoActividad?: number;   // Mantener como envía el backend
     zonasVisitadas?: number;
     ultimaActividad?: string;
   };
