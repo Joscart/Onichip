@@ -1,50 +1,70 @@
-import { Injectable } from '@angular/core';
+
+import { Injectable, NgZone } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { Observable, throwError } from 'rxjs';
+import { Observable, throwError, BehaviorSubject } from 'rxjs';
 import { catchError, retry, timeout, map } from 'rxjs/operators';
+import { Mascota } from '../../app/interfaces/mascota.interface';
+
 
 @Injectable({ providedIn: 'root' })
 export class MascotasService {
-  private apiUrl = 'https://www.onichip.xyz/api/device';
+  private apiUrl = 'https://www.onichip.xyz/api/mascotas';
+  private wsUrl = 'wss://www.onichip.xyz'; // Cambia a ws://localhost:3000 si es local
+  private mascotasSubject = new BehaviorSubject<Mascota[]>([]);
+  mascotas$ = this.mascotasSubject.asObservable();
+  private ws: WebSocket | null = null;
 
-  constructor(private http: HttpClient) {}
-
-  getMascotasByOwner(ownerId: string): Observable<any> {
-    return this.http.get(`${this.apiUrl}/owner/${ownerId}`, {
-      headers: {
-        'Cache-Control': 'no-cache',
-        'Content-Type': 'application/json'
-      }
-    }).pipe(
-      timeout(8000), // Timeout de 8 segundos
-      retry(1), // Reintentar 1 vez automáticamente
-      catchError(this.handleError)
-    );
+  constructor(private http: HttpClient, private ngZone: NgZone) {
+    this.connectWebSocket();
   }
 
-  getMascotaRealtime(deviceId: string): Observable<any> {
-    return this.http.get(`${this.apiUrl}/realtime/${deviceId}`, {
-      headers: {
-        'Cache-Control': 'no-cache',
-        'Content-Type': 'application/json'
-      }
-    }).pipe(
-      timeout(5000),
-      retry(1),
-      map((response: any) => {
-        if (response && response.ubicacionActual) {
-          // Asegurarnos que los valores de latitud y longitud son números
-          response.ubicacionActual.latitude = Number(response.ubicacionActual.latitude);
-          response.ubicacionActual.longitude = Number(response.ubicacionActual.longitude);
+  private connectWebSocket() {
+    this.ws = new WebSocket(this.wsUrl);
+    this.ws.onopen = () => {
+      console.log('🛰️ WebSocket mascotas conectado');
+    };
+    this.ws.onmessage = (event) => {
+      this.ngZone.run(() => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === 'mascota_update') {
+            this.handleMascotaUpdate(msg.data);
+          }
+        } catch (e) {
+          console.error('Error parseando mensaje WS:', e);
         }
-        return response;
-      }),
-      catchError(this.handleError)
-    );
+      });
+    };
+    this.ws.onclose = () => {
+      console.warn('WebSocket mascotas desconectado, reintentando en 3s...');
+      setTimeout(() => this.connectWebSocket(), 3000);
+    };
   }
 
-  getMascotasRealtimeBatch(deviceIds: string[]): Observable<any> {
-    return this.http.post(`${this.apiUrl}/realtime/batch`, { deviceIds }, {
+  private handleMascotaUpdate(update: { action: string, mascota: Mascota }) {
+    const mascotas = [...this.mascotasSubject.value];
+    if (update.action === 'create') {
+      mascotas.push(update.mascota);
+    } else if (update.action === 'update') {
+      const idx = mascotas.findIndex(m => m.deviceId === update.mascota.deviceId);
+      if (idx !== -1) mascotas[idx] = update.mascota;
+    } else if (update.action === 'delete') {
+      const idx = mascotas.findIndex(m => m.deviceId === update.mascota.deviceId);
+      if (idx !== -1) mascotas.splice(idx, 1);
+    }
+    this.mascotasSubject.next(mascotas);
+  }
+  /**
+   * Inicializa la lista de mascotas para el usuario (solo una vez al entrar)
+   */
+  loadMascotasByOwner(ownerId: string) {
+    this.getMascotasByOwner(ownerId).subscribe((mascotas: Mascota[]) => {
+      this.mascotasSubject.next(mascotas);
+    });
+  }
+
+  getMascotasByOwner(ownerId: string): Observable<Mascota[]> {
+    return this.http.get<Mascota[]>(`${this.apiUrl}/owner/${ownerId}`, {
       headers: {
         'Cache-Control': 'no-cache',
         'Content-Type': 'application/json'
@@ -52,22 +72,39 @@ export class MascotasService {
     }).pipe(
       timeout(8000),
       retry(1),
-      map((response: any) => {
-        if (Array.isArray(response)) {
-          // Procesar cada dispositivo en el batch
-          return response.map(device => {
-            if (device && device.ubicacionActual) {
-              // Asegurarnos que los valores de latitud y longitud son números
-              device.ubicacionActual.latitude = Number(device.ubicacionActual.latitude);
-              device.ubicacionActual.longitude = Number(device.ubicacionActual.longitude);
-            }
-            return device;
-          });
-        }
-        return response;
-      }),
       catchError(this.handleError)
     );
+  }
+
+  /**
+   * Obtiene una mascota por deviceId (usando el endpoint de edición por deviceId)
+   */
+  getMascotaByDeviceId(deviceId: string): Observable<Mascota | null> {
+    return this.http.get<Mascota | null>(`${this.apiUrl}/dev/${deviceId}`, {
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Content-Type': 'application/json'
+      }
+    }).pipe(
+      timeout(5000),
+      retry(1),
+      catchError(this.handleError)
+    );
+  }
+
+  /**
+   * Obtiene varias mascotas por un array de deviceIds (paralelamente)
+   */
+  getMascotasByDeviceIds(deviceIds: string[]): Observable<Mascota[]> {
+    // Realiza varias peticiones en paralelo y combina los resultados
+    return new Observable<Mascota[]>(subscriber => {
+      Promise.all(deviceIds.map(id => this.getMascotaByDeviceId(id).toPromise()))
+        .then(results => {
+          subscriber.next(results.filter(Boolean) as Mascota[]);
+          subscriber.complete();
+        })
+        .catch(err => subscriber.error(err));
+    });
   }
 
   updateDeviceId(currentDeviceId: string, body: { deviceId: string }): Observable<any> {

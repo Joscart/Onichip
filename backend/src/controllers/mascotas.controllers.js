@@ -11,6 +11,7 @@
  */
 
 const Mascota = require('../models/mascota');
+const { broadcastMascotaUpdate } = require('../websocket');
 const mascotaController = {};
 
 /**
@@ -130,8 +131,9 @@ mascotaController.addMascota = async (req, res) => {
         
         const mascota = new Mascota(req.body);
         await mascota.save();
-        
         console.log('✅ Mascota creada exitosamente:', mascota.nombre, 'ID:', mascota._id);
+        // Emitir evento WebSocket
+        broadcastMascotaUpdate({ action: 'create', mascota });
         res.json({ message: 'Mascota agregada exitosamente', mascota });
     } catch (err) {
         console.error('❌ Error al crear mascota:', err);
@@ -194,8 +196,9 @@ mascotaController.editMascota = async (req, res) => {
             { $set: req.body },
             { new: true, upsert: false }
         );
-        
         console.log('✅ Mascota actualizada exitosamente:', updated.nombre);
+        // Emitir evento WebSocket
+        broadcastMascotaUpdate({ action: 'update', mascota: updated });
         res.json({ message: 'Mascota actualizada exitosamente', mascota: updated });
     } catch (err) {
         console.error('❌ Error al actualizar mascota:', err);
@@ -214,7 +217,11 @@ mascotaController.editMascota = async (req, res) => {
 
 // DELETE eliminar mascota por ID
 mascotaController.deleteMascota = async (req, res) => {
-    await Mascota.findByIdAndDelete(req.params.id);
+    const deleted = await Mascota.findByIdAndDelete(req.params.id);
+    // Emitir evento WebSocket
+    if (deleted) {
+        broadcastMascotaUpdate({ action: 'delete', mascota: deleted });
+    }
     res.json('Mascota eliminada exitosamente');
 };
 

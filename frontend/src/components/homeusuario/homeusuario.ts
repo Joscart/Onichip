@@ -52,11 +52,18 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
       return;
     }
 
-    // Cargar datos de mascotas con información GPS
-    this.fetchMascotasOptimized();
-
-    // Configurar actualización automática cada 30 segundos
-    this.setupAutoRefresh();
+    // Cargar datos de mascotas y suscribirse a cambios en tiempo real
+    const userId = this.user?.id || this.user?._id;
+    if (userId) {
+      this.mascotasService.loadMascotasByOwner(userId);
+      this.mascotasService.mascotas$
+        .pipe(takeUntil(this.destroy$))
+        .subscribe(mascotas => {
+          this.mascotas = mascotas;
+          this.loading = false;
+          this.cdr.detectChanges();
+        });
+    }
   }
 
   ngAfterViewInit() {
@@ -78,88 +85,7 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
     }
   }
 
-  // 🔄 CONFIGURAR ACTUALIZACIÓN AUTOMÁTICA
-  setupAutoRefresh() {
-    setInterval(() => {
-      this.refreshLocationData();
-
-      // Si el modal del mapa está abierto, actualizar el mapa también
-      if (this.showMapModal && this.selectedMascota) {
-        this.updateMapLocation();
-      }
-    }, 30000); // 30 segundos
-  }
-
-  // 🔄 ACTUALIZAR DATOS DE UBICACIÓN EN TIEMPO REAL
-  refreshLocationData() {
-    // Obtener solo las mascotas que tienen deviceId
-    const mascotasConDispositivo = this.mascotas.filter(
-      mascota => mascota.dispositivo?.id || mascota.deviceId
-    );
-    
-    if (mascotasConDispositivo.length === 0) {
-      console.log('ℹ️ No hay dispositivos para actualizar');
-      return;
-    }
-
-    // Obtener los IDs de los dispositivos
-    const deviceIds = mascotasConDispositivo.map(
-      mascota => mascota.dispositivo?.id || mascota.deviceId
-    ).filter((id): id is string => id !== undefined);
-
-    // Obtener datos del backend
-    this.mascotasService.getMascotasRealtimeBatch(deviceIds).subscribe({
-      next: (response: any) => {
-        if (!response || !Array.isArray(response)) {
-          console.error('❌ Respuesta inválida del servidor:', response);
-          return;
-        }
-
-        // Actualizar cada mascota con sus datos en tiempo real
-        response.forEach(deviceData => {
-          const mascota = this.mascotas.find(m => 
-            (m.dispositivo?.id || m.deviceId) === deviceData.dispositivo?.id
-          );
-
-          if (mascota && deviceData.ubicacionActual) {
-            // Guardar ubicación anterior para detectar cambios
-            const oldLocation = mascota.ubicacionActual ? { ...mascota.ubicacionActual } : null;
-
-        // Si el mapa está abierto y es la mascota seleccionada, actualizar el mapa
-        if (this.showMapModal && this.selectedMascota &&
-            this.selectedMascota._id === mascota._id) {
-
-          // Verificar si la ubicación cambió significativamente
-          if (oldLocation) {
-            const latDiff = Math.abs(mascota.ubicacionActual.latitude - oldLocation.latitude);
-            const lngDiff = Math.abs(mascota.ubicacionActual.longitude - oldLocation.longitude);
-
-            if (latDiff > 0.000001 || lngDiff > 0.000001) { // Cambio mínimo detectable
-              console.log('📍 Nueva ubicación detectada, actualizando mapa...');
-              this.selectedMascota.ubicacionActual = mascota.ubicacionActual;
-              setTimeout(() => this.updateMapLocation(), 100);
-            }
-          } else {
-            // Primera vez que se obtiene ubicación
-            this.selectedMascota.ubicacionActual = mascota.ubicacionActual;
-            setTimeout(() => this.updateMapLocation(), 100);
-          }
-        }
-
-        if (!mascota.dispositivo) {
-          mascota.dispositivo = {};
-        }
-        mascota.dispositivo.bateria = {
-          nivel: Math.floor(Math.random() * 100) + 1,
-          cargando: Math.random() > 0.8
-        };
-      }
-    });
-
-    // Forzar detección de cambios después de actualizar todas las mascotas
-    this.cdr.detectChanges();
-    console.log('🔄 Datos de ubicación actualizados para', this.mascotas.length, 'mascotas');
-  }
+  // La actualización automática y en tiempo real ahora es gestionada por el observable del service.
 
   // 📊 CARGAR DATOS DE MASCOTAS
   fetchMascotasOptimized() {
@@ -331,37 +257,35 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
     }, 10000); // 10 segundos
   }
 
-  // 🔄 ACTUALIZAR UBICACIÓN DE UNA MASCOTA ESPECÍFICA
+  // 🔄 ACTUALIZAR UBICACIÓN DE UNA MASCOTA ESPECÍFICA (usando el nuevo método)
   refreshSingleMascotaLocation(mascota: any) {
-    if (!mascota?.dispositivo?.id) return;
-
-    // Obtener datos en tiempo real del backend
-    this.mascotasService.getMascotaRealtime(mascota.dispositivo.id).subscribe({
+    if (!mascota?.deviceId && !mascota?.dispositivo?.id) return;
+    const deviceId = mascota.deviceId || mascota.dispositivo?.id;
+    this.mascotasService.getMascotaByDeviceId(deviceId).subscribe({
       next: (deviceData: any) => {
         if (deviceData?.ubicacionActual) {
           // Guardar ubicación anterior
           const oldLocation = mascota.ubicacionActual ? { ...mascota.ubicacionActual } : null;
-
           // Actualizar con datos del backend
           mascota.ubicacionActual = deviceData.ubicacionActual;
           mascota.dispositivo = deviceData.dispositivo;
-
-    // Si hay cambio significativo, actualizar el mapa
-    if (oldLocation) {
-      const latDiff = Math.abs(newLocation.latitude - oldLocation.latitude);
-      const lngDiff = Math.abs(newLocation.longitude - oldLocation.longitude);
-
-      if (latDiff > 0.000001 || lngDiff > 0.000001) {
-        console.log('📍 Ubicación actualizada:', newLocation);
-        this.updateMapLocation();
+          // Si hay cambio significativo, actualizar el mapa
+          if (oldLocation) {
+            const latDiff = Math.abs(deviceData.ubicacionActual.latitude - oldLocation.latitude);
+            const lngDiff = Math.abs(deviceData.ubicacionActual.longitude - oldLocation.longitude);
+            if (latDiff > 0.000001 || lngDiff > 0.000001) {
+              console.log('📍 Ubicación actualizada:', deviceData.ubicacionActual);
+              this.updateMapLocation();
+            }
+          } else {
+            // Primera ubicación
+            console.log('📍 Primera ubicación obtenida:', deviceData.ubicacionActual);
+            this.updateMapLocation();
+          }
+          this.cdr.detectChanges();
+        }
       }
-    } else {
-      // Primera ubicación
-      console.log('📍 Primera ubicación obtenida:', newLocation);
-      this.updateMapLocation();
-    }
-
-    this.cdr.detectChanges();
+    });
   }
 
   // 🗺️ INICIALIZAR MAPA CON LEAFLET
@@ -449,12 +373,7 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
   // 🔄 ACTUALIZAR UBICACIÓN EN EL MAPA
   refreshLocation() {
     if (!this.selectedMascota) return;
-
-    // Simular actualización de ubicación (reemplazar con llamada real al API)
-    this.simulateLocationUpdate();
-
-    // Actualizar el mapa con los nuevos datos
-    this.updateMapLocation();
+    this.refreshSingleMascotaLocation(this.selectedMascota);
   }
 
   // 🗺️ ACTUALIZAR MAPA CON NUEVA UBICACIÓN (sin reinicializar)
@@ -588,12 +507,7 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
     `;
   }
 
-  // 🔄 ACTUALIZAR UBICACIÓN
-  refreshLocation() {
-    if (!this.selectedMascota?.dispositivo?.id) return;
-    
-    this.refreshSingleLocation();
-  }
+
 
   verHistorial(mascota: any) {
     // TODO: Implementar vista de historial GPS

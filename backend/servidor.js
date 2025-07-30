@@ -11,12 +11,19 @@
  * @port 3000
  */
 
+
 const express = require('express');
 const app = express();
 const port = 3000;
 const morgan = require('morgan'); 
 const cors = require('cors');
 const mongoose = require('./src/database');
+
+// === WEBSOCKET SERVER ===
+const http = require('http');
+const server = http.createServer(app);
+const { initWebSocket } = require('./src/websocket');
+initWebSocket(server);
 
 // ================================================
 //  IMPORTAR Y REGISTRAR MODELOS
@@ -162,7 +169,7 @@ app.get('/', (req, res) => {
 // 🚀 INICIO DEL SERVIDOR
 // ================================================
 
-app.listen(port, () => {
+server.listen(port, () => {
     console.log(`🚀 Servidor Onichip iniciado exitosamente`);
     console.log(`📡 Puerto: ${port}`);
     console.log(`🌐 URL: http://localhost:${port}`);
