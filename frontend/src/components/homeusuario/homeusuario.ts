@@ -60,6 +60,12 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
         .pipe(takeUntil(this.destroy$))
         .subscribe(mascotas => {
           this.mascotas = mascotas;
+          // Si hay una mascota seleccionada, actualizar la referencia a la versión más reciente
+          if (this.selectedMascota) {
+            const id = this.selectedMascota.deviceId || this.selectedMascota.dispositivo?.id || this.selectedMascota._id;
+            const updated = mascotas.find(m => m.deviceId === id || m.dispositivo?.id === id || m._id === id);
+            if (updated) this.selectedMascota = updated;
+          }
           this.loading = false;
           this.cdr.detectChanges();
         });
@@ -87,62 +93,9 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
 
   // La actualización automática y en tiempo real ahora es gestionada por el observable del service.
 
-  // 📊 CARGAR DATOS DE MASCOTAS
+  // 📊 CARGAR DATOS DE MASCOTAS (legacy, ahora todo es reactivo)
   fetchMascotasOptimized() {
-    this.loading = true;
-    this.currentRetry = 0;
-    this.loadMascotasWithTimeout();
-  }
-
-  private loadMascotasWithTimeout() {
-    console.log(`Intento ${this.currentRetry + 1} de carga de mascotas...`);
-
-    // Obtener el ID correcto del usuario
-    const userId = this.user?.id || this.user?._id;
-    console.log('🆔 ID del usuario para buscar mascotas:', userId);
-
-    if (!userId) {
-      console.error('❌ No se encontró ID del usuario');
-      this.loading = false;
-      return;
-    }
-
-    this.mascotasService.getMascotasByOwner(userId)
-      .pipe(
-        timeout(5000), // Timeout de 5 segundos
-        takeUntil(this.destroy$),
-        catchError((error) => {
-          console.error('Error en la carga:', error);
-
-          if (this.currentRetry < this.maxRetries) {
-            this.currentRetry++;
-            setTimeout(() => this.loadMascotasWithTimeout(), 1000);
-            return of(null);
-          }
-
-          // Si fallan todos los intentos, mostrar datos vacíos
-          return of([]);
-        })
-      )
-      .subscribe({
-        next: (data: any) => {
-          if (data !== null) {
-            console.log('Mascotas cargadas exitosamente:', data?.length || 0, 'mascotas');
-            this.mascotas = (data || []).map((m: any) => ({
-              ...m,
-              fechaSignos: this.getCurrentDateTime(),
-            }));
-            this.loading = false;
-            this.cdr.detectChanges(); // Forzar detección de cambios
-          }
-        },
-        error: (err) => {
-          console.error('Error final al cargar mascotas:', err);
-          this.mascotas = [];
-          this.loading = false;
-          this.cdr.detectChanges();
-        }
-      });
+    // Ya no hace nada, la carga es reactiva por el observable
   }
 
   getCurrentDateTime(): string {
@@ -596,9 +549,12 @@ export class Homeusuario implements OnInit, OnDestroy, AfterViewInit {
     });
   }
 
-  // Método para refrescar datos manualmente
+  // Método para refrescar datos manualmente (ahora solo recarga desde backend)
   refreshData() {
-    this.fetchMascotasOptimized();
+    const userId = this.user?.id || this.user?._id;
+    if (userId) {
+      this.mascotasService.loadMascotasByOwner(userId);
+    }
   }
 
   // Método legacy mantenido para compatibilidad

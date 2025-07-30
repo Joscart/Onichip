@@ -33,6 +33,9 @@ router.post('/mascotas', mascotaController.addMascota);
 // PUT /api/mascotas/:id - Actualizar mascota por ID
 router.put('/mascotas/:id', mascotaController.editMascota);
 
+// GET /api/mascotas/dev/:deviceId - Obtener mascota por ID de dispositivo
+router.get('/mascotas/dev/:deviceId', mascotaController.getMascotaByDeviceId);
+
 // PUT /api/mascotas/dev/:deviceId - Actualizar mascota por ID de dispositivo
 router.put('/mascotas/dev/:deviceId', mascotaController.editMascota);
 

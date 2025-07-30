@@ -8,8 +8,8 @@ import { Mascota } from '../../app/interfaces/mascota.interface';
 
 @Injectable({ providedIn: 'root' })
 export class MascotasService {
-  private apiUrl = 'https://www.onichip.xyz/api/mascotas';
-  private wsUrl = 'wss://www.onichip.xyz'; // Cambia a ws://localhost:3000 si es local
+  private apiUrl = 'http://localhost:3000/api/mascotas';
+  private wsUrl = 'ws://localhost:3000'; // Cambia a ws://localhost:3000 si es local
   private mascotasSubject = new BehaviorSubject<Mascota[]>([]);
   mascotas$ = this.mascotasSubject.asObservable();
   private ws: WebSocket | null = null;
@@ -77,7 +77,7 @@ export class MascotasService {
   }
 
   /**
-   * Obtiene una mascota por deviceId (usando el endpoint de edición por deviceId)
+   * Obtiene una mascota por deviceId usando el endpoint GET correcto
    */
   getMascotaByDeviceId(deviceId: string): Observable<Mascota | null> {
     return this.http.get<Mascota | null>(`${this.apiUrl}/dev/${deviceId}`, {

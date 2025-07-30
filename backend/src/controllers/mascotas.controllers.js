@@ -81,10 +81,31 @@ mascotaController.getMascota = async (req, res) => {
 mascotaController.getMascotasByOwner = async (req, res) => {
     try {
         const ownerId = req.params.ownerId;
-        const mascotas = await Mascota.find({ propietario: ownerId }).populate('propietario', 'nombre email');
+        const mascotas = await Mascota.find({ propietario: ownerId }).populate('propietario', 'nombre email').lean();
         
-        console.log(`✅ ${mascotas.length} mascotas encontradas para propietario ${ownerId}`);
-        res.json(mascotas);
+        // Normalizar datos de MongoDB para envío correcto al frontend
+        const mascotasNormalizadas = mascotas.map(mascota => ({
+            ...mascota,
+            ubicacionActual: mascota.ubicacionActual ? {
+                latitud: Number(mascota.ubicacionActual.latitud),
+                longitud: Number(mascota.ubicacionActual.longitud),
+                precision: Number(mascota.ubicacionActual.precision || 10),
+                timestamp: mascota.ubicacionActual.timestamp,
+                metodo: mascota.ubicacionActual.metodo || 'GPS'
+            } : null,
+            dispositivo: mascota.dispositivo ? {
+                ...mascota.dispositivo,
+                estadoBateria: mascota.dispositivo.estadoBateria ? {
+                    nivel: Number(mascota.dispositivo.estadoBateria.nivel || 0),
+                    cargando: Boolean(mascota.dispositivo.estadoBateria.cargando),
+                    ultimaActualizacion: mascota.dispositivo.estadoBateria.ultimaActualizacion
+                } : null
+            } : null,
+            edad: Number(mascota.edad || 0)
+        }));
+        
+        console.log(`✅ ${mascotasNormalizadas.length} mascotas encontradas para propietario ${ownerId}`);
+        res.json(mascotasNormalizadas);
     } catch (error) {
         console.error('❌ Error al obtener mascotas por propietario:', error);
         res.status(500).json({ message: 'Error al obtener mascotas por propietario' });
@@ -212,6 +233,57 @@ mascotaController.editMascota = async (req, res) => {
         }
         
         res.status(400).json({ message: 'Error al actualizar mascota', error: err.message });
+    }
+};
+
+/**
+ * 🐾 Obtener mascota por deviceId
+ * 
+ * @description Obtiene una mascota específica por su deviceId
+ * @route GET /api/mascotas/dev/:deviceId
+ * @access Public
+ * 
+ * @input {string} req.params.deviceId - ID del dispositivo
+ * 
+ * @output {Object} 200 - Mascota encontrada
+ * @output {Object} 404 - Mascota no encontrada
+ * @output {Object} 500 - Error interno del servidor
+ */
+mascotaController.getMascotaByDeviceId = async (req, res) => {
+    try {
+        const { deviceId } = req.params;
+        const mascota = await Mascota.findOne({ deviceId }).populate('propietario', 'nombre email').lean();
+        
+        if (!mascota) {
+            return res.status(404).json({ message: 'Mascota no encontrada con el deviceId proporcionado' });
+        }
+        
+        // Normalizar datos como en getMascotasByOwner
+        const mascotaNormalizada = {
+            ...mascota,
+            ubicacionActual: mascota.ubicacionActual ? {
+                latitud: Number(mascota.ubicacionActual.latitud),
+                longitud: Number(mascota.ubicacionActual.longitud),
+                precision: Number(mascota.ubicacionActual.precision || 10),
+                timestamp: mascota.ubicacionActual.timestamp,
+                metodo: mascota.ubicacionActual.metodo || 'GPS'
+            } : null,
+            dispositivo: mascota.dispositivo ? {
+                ...mascota.dispositivo,
+                estadoBateria: mascota.dispositivo.estadoBateria ? {
+                    nivel: Number(mascota.dispositivo.estadoBateria.nivel || 0),
+                    cargando: Boolean(mascota.dispositivo.estadoBateria.cargando),
+                    ultimaActualizacion: mascota.dispositivo.estadoBateria.ultimaActualizacion
+                } : null
+            } : null,
+            edad: Number(mascota.edad || 0)
+        };
+        
+        console.log(`✅ Mascota obtenida por deviceId: ${mascota.nombre}`);
+        res.json(mascotaNormalizada);
+    } catch (error) {
+        console.error('❌ Error al obtener mascota por deviceId:', error);
+        res.status(500).json({ message: 'Error al obtener mascota por deviceId' });
     }
 };
 
