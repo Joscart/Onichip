@@ -653,14 +653,14 @@ void loop() {
       }
       
       // Log de estado final
-      Serial.printf("� Batería: %.2f V | Carga: %s\n", batV, charging ? "Sí" : "No");
+      Serial.printf("  Batería: %.2f V | Carga: %s\n", batV, charging ? "Sí" : "No");
       
       // Enviar datos de ubicación
       bool sendSuccess = sendLocationData(location, batV, charging);
       
       if (sendSuccess) {
         blinkConnected(); // Parpadeo de éxito
-        Serial.printf("� Transmisión exitosa - Próximo envío en %ds\n", sendInterval/1000);
+        Serial.printf("  Transmisión exitosa - Próximo envío en %ds\n", sendInterval/1000);
       } else {
         Serial.println("⚠️ Fallo en transmisión - Continuando...");
         blinkError(1);
@@ -730,7 +730,7 @@ void reconnect() {
   ConnStatus st = checkConnectionLegacy(); // Usar función legacy
   
   if (st == NO_NETWORK) {
-    Serial.println("� Sin red móvil - Reiniciando módem completo...");
+    Serial.println("  Sin red móvil - Reiniciando módem completo...");
     
     // Asegurar que WiFi esté apagado antes del reset del módem
     WiFi.disconnect(true);
@@ -2180,7 +2180,7 @@ bool diagnosticoConexion2G() {
         }
         
         // Paso 9: Test de conectividad real con ping
-        Serial.println("\n� Test de conectividad real...");
+        Serial.println("\n  Test de conectividad real...");
         SerialAT.println("AT+HTTPINIT");
         delay(1000);
         SerialAT.println("AT+HTTPPARA=\"CID\",1");
@@ -2203,7 +2203,7 @@ bool diagnosticoConexion2G() {
         
         if (httpResponse.indexOf("200") >= 0) {
             Serial.println("✅ Conectividad HTTP confirmada");
-            Serial.println("�🎉 === CONEXIÓN 2G COMPLETAMENTE FUNCIONAL ===");
+            Serial.println(" 🎉 === CONEXIÓN 2G COMPLETAMENTE FUNCIONAL ===");
         } else {
             Serial.println("⚠️ GPRS conectado pero sin acceso HTTP");
             Serial.println("💡 Posible problema de DNS o firewall del operador");
